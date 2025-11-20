@@ -1,0 +1,535 @@
+{
+	"name": "1d_GetDatabaseSourceSchema_Oracle",
+	"properties": {
+		"description": "Get Run Metadata from Oracle Source \n\nlast change JP 20200219",
+		"activities": [
+			{
+				"name": "GetTableList",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "ResetSourceSchema Merge",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetExtractFeedList]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Extract Build Schemas",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetTableList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetTableList').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Build Staging Schema",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "OracleSource",
+									"additionalColumns": [
+										{
+											"name": "DataFactoryName",
+											"value": {
+												"value": "@pipeline().DataFactory",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "PipelineName",
+											"value": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "PipelineRunId",
+											"value": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "BatchRunId",
+											"value": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "BatchGroupId",
+											"value": {
+												"value": "@string(pipeline().parameters.BatchGroupId)",
+												"type": "Expression"
+											}
+										}
+									],
+									"oracleReaderQuery": {
+										"value": "with sessionvars as\n( SELECT '@{Item().SourceTable}' As SourceName  \n  ,'@{Item().SourceSchema}' As SourceSchema\n  ,'@{item().Domain}' As Domain\n  ,'@{item().Subject}' As Subject \n  ,'@{int(Item().FeedKey)}' As FeedKey \nFrom DUAL ),\n\n\n--Primary Keys\npkcols As (\nSELECT CASE WHEN LENGTH(LISTAGG(COLUMN_NAME, ' ASC,') WITHIN GROUP (ORDER BY COLUMN_NAME)) > 0 \n            THEN SUBSTR(LISTAGG(COLUMN_NAME, ' ASC,') WITHIN GROUP (ORDER BY COLUMN_NAME),1, LENGTH(LISTAGG(COLUMN_NAME, ' ASC,') WITHIN GROUP (ORDER BY COLUMN_NAME))-1)\n            ELSE '' END As PKs, tc.TABLE_NAME\n    FROM all_constraints tc\n    JOIN all_cons_columns ccu ON tc.CONSTRAINT_NAME = ccu.Constraint_name\n    JOIN sessionvars sv On tc.TABLE_NAME = sv.SourceName\n    WHERE tc.CONSTRAINT_TYPE = 'P'\n    GROUP BY tc.TABLE_NAME)\n\n\nSELECT \n    sv.FeedKey, \n    sv.SourceName         AS TableName,\n    sv.SourceSchema      AS SchemaName,\n    c.COLUMN_ID    AS FieldPosition, \n    0                   AS ScriptHeader,\n    '[' || replace(replace(replace(c.COLUMN_NAME,' ', '_'), '(', '_'), ')', '_') || '] ' ||\n        '[' ||\n        case when c.DATA_TYPE = 'datetime' then 'datetime2' else c.DATA_TYPE end ||\n        ']' || \n        case \n            when c.DATA_TYPE in ('NVARCHAR', 'VARCHAR', 'NCHAR', 'CHAR', 'VARCHAR2') then '(' || replace(cast(CHAR_LENGTH as varchar2(4)),'-1','MAX') || ')'\n            when c.DATA_TYPE in ('varbinary') then '(' || replace(cast(CHAR_LENGTH as varchar2(4)),'-1','MAX') || ')'\n            when c.DATA_TYPE in ('int', 'bigint', 'uniqueidentifier') then ''\n            when c.DATA_TYPE in ('datetime', 'datetime2') then '(0)'\n            when c.DATA_TYPE in ('NUMBER') then '(' || cast(DATA_PRECISION as varchar2(4)) || ',' || cast(DATA_SCALE as varchar2(4)) || ')'\n            else '' \n        end ||\n        case when pk.c is null then ' NULL' else ' NOT NULL' end ||\n        case \n            when COLUMN_ID = (select max(COLUMN_ID) from all_tab_cols where TABLE_NAME = sv.sourcename) \n                AND pkc.table_name IS NOT NULL\n            then ', CONSTRAINT [PK_' || sv.SourceName || '] PRIMARY KEY CLUSTERED ( ' || pkc.pks || ') )'\n            else ',' end                                        as FieldCreateSQL,\n\n    replace(replace(replace(c.COLUMN_NAME,' ', '_'), '(', '_'), ')', '_')         as FieldName,\n    replace(replace(replace(c.COLUMN_NAME,' ', '_'), '(', '_'), ')', '_')       as FieldWarehouseName, --for WarehouseMapping\n\n    '[' ||\n        case when DATA_TYPE = 'datetime' then 'datetime2' else DATA_TYPE end ||\n        ']' || \n        case \n            when DATA_TYPE in ('NVARCHAR', 'VARCHAR', 'NCHAR', 'CHAR', 'VARCHAR2') then '(' || replace(cast(CHAR_LENGTH as varchar2(4)),'-1','MAX') || ')'\n            when DATA_TYPE in ('varbinary') then '(' || replace(cast(CHAR_LENGTH as varchar2(4)),'-1','MAX') || ')'\n            when DATA_TYPE in ('int', 'bigint', 'uniqueidentifier') then ''\n            when DATA_TYPE in ('datetime', 'datetime2') then '(0)'\n            when DATA_TYPE in ('NUMBER') then '(' || cast(DATA_PRECISION as varchar2(4)) || ',' || cast(DATA_SCALE as varchar2(4)) || ')'\n            else '' \n        end                                                    as FieldDataType,\n    case when pk.c is null then 0 else 1 end                    as PrimaryKeyCol --PrimaryKeyField \n\nFROM all_tab_cols c\nJOIN sessionvars sv On c.TABLE_NAME = sv.SourceName\nLEFT JOIN pkcols pkc On c.TABLE_NAME = pkc.TABLE_NAME\nLEFT JOIN   \n    (\n    SELECT \n        ccu.COLUMN_NAME as c, tc.TABLE_NAME As t\n    FROM \n        all_constraints tc\n    JOIN \n        all_cons_columns ccu \n        ON  tc.CONSTRAINT_NAME = ccu.Constraint_name\n    WHERE tc.CONSTRAINT_TYPE = 'P'\n    ) pk \n    ON c.COLUMN_NAME = pk.c\n    AND sv.SourceName = pk.t\nORDER BY \n    c.COLUMN_ID;",
+										"type": "Expression"
+									},
+									"partitionOption": "None",
+									"queryTimeout": "02:00:00"
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "insert",
+									"disableMetricsCollection": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "TABLENAME"
+											},
+											"sink": {
+												"name": "TableName"
+											}
+										},
+										{
+											"source": {
+												"name": "SCHEMANAME"
+											},
+											"sink": {
+												"name": "SchemaName",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "SCRIPTHEADER"
+											},
+											"sink": {
+												"name": "ScriptHeader",
+												"type": "Boolean"
+											}
+										},
+										{
+											"source": {
+												"name": "FIELDPOSITION"
+											},
+											"sink": {
+												"name": "FieldPosition",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "FIELDNAME"
+											},
+											"sink": {
+												"name": "FieldName",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "FIELDDATATYPE"
+											},
+											"sink": {
+												"name": "FieldDataType",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "FIELDCREATESQL"
+											},
+											"sink": {
+												"name": "FieldCreateSQL",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "PRIMARYKEYCOL"
+											},
+											"sink": {
+												"name": "FieldPrimaryKey"
+											}
+										},
+										{
+											"source": {
+												"name": "DataFactoryName"
+											},
+											"sink": {
+												"name": "DataFactoryName"
+											}
+										},
+										{
+											"source": {
+												"name": "PipelineName"
+											},
+											"sink": {
+												"name": "PipelineName"
+											}
+										},
+										{
+											"source": {
+												"name": "PipelineRunId"
+											},
+											"sink": {
+												"name": "PipelineRunId"
+											}
+										},
+										{
+											"source": {
+												"name": "FIELDWAREHOUSENAME"
+											},
+											"sink": {
+												"name": "FieldWarehouseName"
+											}
+										},
+										{
+											"source": {
+												"name": "BatchGroupId"
+											},
+											"sink": {
+												"name": "BatchGroupId"
+											}
+										},
+										{
+											"source": {
+												"name": "BatchRunId"
+											},
+											"sink": {
+												"name": "BatchRunId"
+											}
+										},
+										{
+											"source": {
+												"name": "FEEDKEY"
+											},
+											"sink": {
+												"name": "FeedKey"
+											}
+										}
+									]
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsOracleTable",
+									"type": "DatasetReference",
+									"parameters": {
+										"Table": {
+											"value": "@item().SourceTable",
+											"type": "Expression"
+										},
+										"ServerName": {
+											"value": "@item().ServerName",
+											"type": "Expression"
+										},
+										"DatabaseName": {
+											"value": "@Item().DBName",
+											"type": "Expression"
+										},
+										"Secret": {
+											"value": "@Item().KeyVaultSecret",
+											"type": "Expression"
+										},
+										"Port": {
+											"value": "@Item().FriendlyServerName",
+											"type": "Expression"
+										},
+										"User": {
+											"value": "@Item().Collation",
+											"type": "Expression"
+										},
+										"keyvaultdnsname": {
+											"value": "@pipeline().parameters.keyvaultdnsname",
+											"type": "Expression"
+										},
+										"schema": {
+											"value": "@Item().SourceSchema",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsTableSchema",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "Build Staging Schema",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						},
+						{
+							"name": "Set BatchProcess Close Error9",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Build Staging Schema",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchProcessLogId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@{activity('Build Staging Schema').Error.Message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "1c Build Staging Schema",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp_Azure",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "SourceSchema Merge",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Extract Build Schemas",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[transform].[SourceSchema]",
+					"storedProcedureParameters": {
+						"BatchGroupId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchGroupId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"BatchRunId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRunId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp_Azure",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "ResetSourceSchema Merge",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[ReSetTempSourceSchema]"
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp_Azure",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"concurrency": 8,
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"BatchRunId": {
+				"type": "string",
+				"defaultValue": "2"
+			},
+			"BatchProcessLogId": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "DSC2APP1"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"standard load eg CE"
+		],
+		"lastPublishTime": "2021-07-31T20:19:54Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

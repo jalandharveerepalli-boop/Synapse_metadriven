@@ -1,0 +1,173 @@
+{
+	"name": "ScalePool",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetSynapseDetails",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetSynapseServerList]",
+						"storedProcedureParameters": {
+							"ExecutionFrequencyGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.ExecutionFrequencyGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsApplication",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetSynapseDetails",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetSynapseDetails').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "If Condition1",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(\n            item().SynapseVersion, \n            1\n        )",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "ScaleSQLPool_SynapseWorkspace",
+										"type": "WebActivity",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"url": {
+												"value": "@concat('https://management.azure.com/subscriptions/',item().SubscriptionId,'/resourceGroups/',item().ResourceGroup,'/providers/Microsoft.Synapse/workspaces/',item().FriendlyDatabaseName,'/sqlPools/',item().DatabaseName,'?api-version=2019-06-01-preview')",
+												"type": "Expression"
+											},
+											"method": "PATCH",
+											"headers": {
+												"Content-Type": "application/json; charset=UTF-8"
+											},
+											"body": {
+												"value": "@concat('{\"properties\": {\"requestedServiceObjectiveName\": \"',pipeline().parameters.ScaleTo,'\"}}')",
+												"type": "Expression"
+											},
+											"authentication": {
+												"type": "MSI",
+												"resource": "https://management.core.windows.net"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "ScaleSQLPool_SQLDWGen2",
+										"type": "WebActivity",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"url": {
+												"value": "@concat('https://management.azure.com/subscriptions/',item().SubscriptionId,'/resourceGroups/',item().ResourceGroup,'/providers/Microsoft.Sql/servers/',item().FriendlyDatabaseName,'/databases/',item().DatabaseName,'?api-version=2014-04-01-preview')",
+												"type": "Expression"
+											},
+											"method": "PATCH",
+											"headers": {
+												"Content-Type": "application/json; charset=UTF-8"
+											},
+											"body": {
+												"value": "@concat('{\"properties\": {\"requestedServiceObjectiveName\": \"',pipeline().parameters.ScaleTo,'\"}}')",
+												"type": "Expression"
+											},
+											"authentication": {
+												"type": "MSI",
+												"resource": "https://management.core.windows.net"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"ScaleTo": {
+				"type": "string",
+				"defaultValue": "DW100c"
+			},
+			"ExecutionFrequencyGroupId": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"mdpdb": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "MDPUtil"
+		},
+		"annotations": [],
+		"lastPublishTime": "2020-11-09T17:01:02Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

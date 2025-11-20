@@ -1,0 +1,107 @@
+{
+	"name": "01c_PreProcess_TempTableCreate",
+	"properties": {
+		"activities": [
+			{
+				"name": "Create Global TempTable",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.02:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[temp].[DynamicallyCreateTempTable]",
+					"storedProcedureParameters": {
+						"BatchGroupID": {
+							"value": {
+								"value": "@pipeline().parameters.BatchGroupID",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"FeedKey": {
+							"value": {
+								"value": "@pipeline().parameters.FeedKey",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"Headers": {
+							"value": {
+								"value": "@pipeline().parameters.Headers",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineRunID": {
+							"value": {
+								"value": "@string(pipeline().parameters.PipelineRunID)",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"timeout": {
+							"value": "60",
+							"type": "Int32"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"FeedKey": {
+				"type": "int",
+				"defaultValue": 20001
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "lbs-sqldb-mdp-dev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "lbs-sql-mdp-dev.database.windows.net"
+			},
+			"Headers": {
+				"type": "string",
+				"defaultValue": "[addressesonrolltableid] varchar(4000) NULL,[NativeId] varchar(4000) NULL,[addressesonrollorderseqcolumn] varchar(4000) NULL,[sourceid] varchar(4000) NULL,[pupilonrolltableid] varchar(4000) NULL,[uniquepropertyreferencenumber] varchar(4000) NULL,[postcode] varchar(4000) NULL,[saon] varchar(4000) NULL,[paon] varchar(4000) NULL,[street] varchar(4000) NULL,[locality] varchar(4000) NULL,[town] varchar(4000) NULL,[administrativearea] varchar(4000) NULL,[posttown] varchar(4000) NULL,[addressline1] varchar(4000) NULL,[addressline2] varchar(4000) NULL,[addressline3] varchar(4000) NULL,[addressline4] varchar(4000) NULL,[addressline5] varchar(4000) NULL,[addressesoffrolltableid] varchar(4000) NULL,[addressesoffrollorderseqcolumn] varchar(4000) NULL,[pupilnolongeronrolltableid] varchar(4000) NULL,[addressestableid] varchar(4000) NULL,[addressesorderseqcolumn] varchar(4000) NULL,[uprn] varchar(4000) NULL,"
+			},
+			"BatchGroupID": {
+				"type": "string",
+				"defaultValue": "2"
+			},
+			"PipelineRunID": {
+				"type": "string",
+				"defaultValue": "7bc9e99f-4e0d-44c3-b6bb-30f699c28d75"
+			},
+			"BatchRunID": {
+				"type": "int"
+			},
+			"BatchProcessLogID": {
+				"type": "int"
+			}
+		},
+		"folder": {
+			"name": "MDPPreProcess"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,343 @@
+{
+	"name": "1m_GetCSVSourceSchema_AmazonS3",
+	"properties": {
+		"description": "Get Metadata from Source \n",
+		"activities": [
+			{
+				"name": "GetTableList",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetExtractFeedList]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Extract Build Schemas",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetTableList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetTableList').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "Set File Structure",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						},
+						{
+							"name": "Set BatchProcess Close Error9",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Set File Structure",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchProcessLogId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('Set File Structure').Error.Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "1c Build Staging Schema",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Get File Metadata",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "dsAmazonS3",
+									"type": "DatasetReference",
+									"parameters": {
+										"S3Bucket": {
+											"value": "@item().ServerName",
+											"type": "Expression"
+										},
+										"S3Directory": {
+											"value": "@item().SourceSchema",
+											"type": "Expression"
+										},
+										"S3FileName": {
+											"value": "@item().SourceTable",
+											"type": "Expression"
+										},
+										"S3AccessKey": {
+											"value": "@item().UserName",
+											"type": "Expression"
+										},
+										"S3KeySecretName": {
+											"value": "@item().KeyVaultSecret",
+											"type": "Expression"
+										},
+										"keyvaultdnsname": {
+											"value": "@pipeline().parameters.keyvaultdnsname",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"itemName",
+									"structure"
+								],
+								"storeSettings": {
+									"type": "AmazonS3ReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "Set File Structure",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Get File Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetFileSourceSchema]",
+								"storedProcedureParameters": {
+									"BatchGroupId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchGroupId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"FeedKey": {
+										"value": {
+											"value": "@item().FeedKey",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"BatchRunId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchRunId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"TableName": {
+										"value": {
+											"value": "@item().SourceTable",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SchemaName": {
+										"value": {
+											"value": "@item().SourceSchema",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"DataFactoryName": {
+										"value": {
+											"value": "@pipeline().DataFactory",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"PipelineRunId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"FileStructure": {
+										"value": {
+											"value": "@string(activity('Get File Metadata').output.structure)",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 50
+			},
+			"BatchRunId": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"BatchProcessLogId": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "devmdpdb1001"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "devmdpsq1001.database.windows.net"
+			},
+			"keyvaultdnsname": {
+				"type": "string",
+				"defaultValue": "devmdpkv1003"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "DSC2APP1"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T20:13:33Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

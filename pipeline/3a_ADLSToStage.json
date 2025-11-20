@@ -1,0 +1,512 @@
+{
+	"name": "3a_ADLSToStage",
+	"properties": {
+		"description": "[Process Stream Code = ADLS2STG]",
+		"activities": [
+			{
+				"name": "LookupMetadata",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "PreStagingTasks",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetEXTERNALFeedMetadata]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Staging Updates",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LookupMetadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LookupMetadata').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "OptionTypeSwitch",
+							"description": "0 = SQLPool (Standard Run)\n1 = Azure SQL",
+							"type": "Switch",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@string(item().ExternalStagedOutputType)",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "1",
+										"activities": [
+											{
+												"name": "3a1_ADLSToStage_AzureSQL",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "3a1_ADLSToStage_AzureSQL",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"workspace": {
+															"value": "@pipeline().parameters.workspace",
+															"type": "Expression"
+														},
+														"sqlpool": {
+															"value": "@pipeline().parameters.sqlpool",
+															"type": "Expression"
+														},
+														"IntegrationControlKey": {
+															"value": "@item().IntegrationControlKey",
+															"type": "Expression"
+														},
+														"CDCGroupType": {
+															"value": "@item().CDCGroupType",
+															"type": "Expression"
+														},
+														"RowCDCType": {
+															"value": "@item().RowCDCType",
+															"type": "Expression"
+														},
+														"ExternalTableName": {
+															"value": "@item().ExternalTableName",
+															"type": "Expression"
+														},
+														"StagingTableName": {
+															"value": "@item().StagingTableName",
+															"type": "Expression"
+														},
+														"FeedKey": {
+															"value": "@item().FeedKey",
+															"type": "Expression"
+														},
+														"ExternalTableNameADLS": {
+															"value": "@item().ExternalTableNameADLS",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@item().CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@item().EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@item().RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@item().CreateKeyFile",
+															"type": "Expression"
+														},
+														"ExternalStagedOutputType": {
+															"value": "@item().ExternalStagedOutputType",
+															"type": "Expression"
+														},
+														"ExternalDatabaseName": {
+															"value": "@item().ExternalDatabaseName",
+															"type": "Expression"
+														},
+														"ExternalDatabaseServerName": {
+															"value": "@item().ExternalDatabaseServerName",
+															"type": "Expression"
+														},
+														"ExternalDatabaseKeyVaultSecret": {
+															"value": "@item().ExternalDatabaseKeyVaultSecret",
+															"type": "Expression"
+														},
+														"ExternalDatabaseUserName": {
+															"value": "@item().ExternalDatabaseUserName",
+															"type": "Expression"
+														},
+														"ExternalSchemaName": {
+															"value": "@item().ExternalSchemaName",
+															"type": "Expression"
+														},
+														"ADLSContainer": {
+															"value": "@item().ADLSContainer",
+															"type": "Expression"
+														},
+														"ADLSFolder": {
+															"value": "@item().ADLSFolder",
+															"type": "Expression"
+														},
+														"globalparameterStorageURI": {
+															"value": "@pipeline().parameters.globalparameterStorageURI",
+															"type": "Expression"
+														},
+														"StageTableName": {
+															"value": "@item().StageTableName",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "0",
+										"activities": [
+											{
+												"name": "3a0_ADLSToStage_SQLPool",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "3a0_ADLSToStage_SQLPool",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"workspace": {
+															"value": "@pipeline().parameters.workspace",
+															"type": "Expression"
+														},
+														"sqlpool": {
+															"value": "@pipeline().parameters.sqlpool",
+															"type": "Expression"
+														},
+														"IntegrationControlKey": {
+															"value": "@item().IntegrationControlKey",
+															"type": "Expression"
+														},
+														"CDCGroupType": {
+															"value": "@item().CDCGroupType",
+															"type": "Expression"
+														},
+														"RowCDCType": {
+															"value": "@item().RowCDCType",
+															"type": "Expression"
+														},
+														"ExternalTableName": {
+															"value": "@item().ExternalTableName",
+															"type": "Expression"
+														},
+														"StagingTableName": {
+															"value": "@item().StagingTableName",
+															"type": "Expression"
+														},
+														"FeedKey": {
+															"value": "@item().FeedKey",
+															"type": "Expression"
+														},
+														"ExternalTableNameADLS": {
+															"value": "@item().ExternalTableNameADLS",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@item().CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@item().EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@item().RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@item().CreateKeyFile",
+															"type": "Expression"
+														},
+														"ExternalStagedOutputType": {
+															"value": "@item().ExternalStagedOutputType",
+															"type": "Expression"
+														},
+														"ExternalDatabaseName": {
+															"value": "@item().ExternalDatabaseName",
+															"type": "Expression"
+														},
+														"ExternalDatabaseServerName": {
+															"value": "@item().ExternalDatabaseServerName",
+															"type": "Expression"
+														},
+														"ExternalDatabaseKeyVaultSecret": {
+															"value": "@item().ExternalDatabaseKeyVaultSecret",
+															"type": "Expression"
+														},
+														"ExternalDatabaseUserName": {
+															"value": "@item().ExternalDatabaseUserName",
+															"type": "Expression"
+														},
+														"ExternalSchemaName": {
+															"value": "@item().ExternalSchemaName",
+															"type": "Expression"
+														},
+														"ADLSContainer": {
+															"value": "@item().ADLSContainer",
+															"type": "Expression"
+														},
+														"ADLSFolder": {
+															"value": "@item().ADLSFolder",
+															"type": "Expression"
+														},
+														"globalparameterStorageURI": {
+															"value": "@pipeline().parameters.globalparameterStorageURI",
+															"type": "Expression"
+														},
+														"StageTableName": {
+															"value": "@item().StageTableName",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "Wait1",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitTimeInSeconds": 1
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "PreStagingTasks",
+				"description": "disable duplicate files\ndelete unpersisted staging",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Prepare Intergration Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetMetadataPreStaging]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Prepare Intergration Metadata",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].SetMetadataPreIntegration"
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"workspace": {
+				"type": "string"
+			},
+			"sqlpool": {
+				"type": "string"
+			},
+			"globalparameterStorageURI": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "ADLS2STG"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"standard load eg CE"
+		],
+		"lastPublishTime": "2022-02-06T13:25:25Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

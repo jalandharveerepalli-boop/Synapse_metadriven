@@ -1,0 +1,1642 @@
+{
+	"name": "3b_FinOpsPrepareSource",
+	"properties": {
+		"description": "[Process Stream Code = CSV2PQT]\n ",
+		"activities": [
+			{
+				"name": "Set BatchProcessLogId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogProcessStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchProcessLogId",
+					"value": {
+						"value": "@activity('LogProcessStart').output.firstrow.NewProcessId",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Load to Parquet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": " ",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogProcessStart",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetBatchProcessLog]",
+						"storedProcedureParameters": {
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							},
+							"NewProcessId": {
+								"type": "Int32",
+								"value": "0"
+							},
+							"ProcessBatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"ProcessDataFactoryName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().DataFactory",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineRunId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								}
+							},
+							"ProcessRunMode": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.RunMode",
+									"type": "Expression"
+								}
+							},
+							"ProcessStreamCode": {
+								"type": "String",
+								"value": {
+									"value": "@variables('ProcessStream')",
+									"type": "Expression"
+								}
+							},
+							"ProcessTriggerId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "LookupMetadata",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Pause 2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetPARQUETFeedMetadata]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Load to Parquet",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LookupMetadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LookupMetadata').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "If Multiple Source Files",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(item().PartitionMergeFlag,true)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Log CSV2PQT Single",
+										"description": "",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "CSV to PQT Single",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[SetIntegrationControlProcess]",
+											"storedProcedureParameters": {
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@item().IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"OptionalDetail": {
+													"value": "nothing",
+													"type": "String"
+												},
+												"PipelineId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProcessStream": {
+													"value": "CSV2PQT",
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "CSV to PQT Single",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "ParquetSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "ParquetWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"enableSkipIncompatibleRow": true,
+											"logSettings": {
+												"enableCopyActivityLog": true,
+												"copyActivityLogSettings": {
+													"logLevel": "Warning",
+													"enableReliableLogging": false
+												},
+												"logLocationSettings": {
+													"linkedServiceName": {
+														"referenceName": "lsADLS",
+														"type": "LinkedServiceReference"
+													},
+													"path": "failed"
+												}
+											},
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "dsADLSfile_noheader",
+												"type": "DatasetReference",
+												"parameters": {
+													"blobfolder": "@item().ADLSFolder",
+													"blobcontainer": {
+														"value": "@item().ADLSContainerCSV",
+														"type": "Expression"
+													},
+													"FileName": "@item().ExternalStorageFile"
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsADLSFileParquet",
+												"type": "DatasetReference",
+												"parameters": {
+													"blobfolder": "@item().ADLSFolder",
+													"blobcontainer": {
+														"value": "@variables('ParquetContainer')",
+														"type": "Expression"
+													},
+													"filename": "@item().ExternalStorageFilePQT"
+												}
+											}
+										]
+									},
+									{
+										"name": "Record Telemetry Single",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Log CSV2PQT Single",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[RecordTelemetry]",
+											"storedProcedureParameters": {
+												"FeedPath": {
+													"value": {
+														"value": "@item().ADLSFolder",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"TableName": {
+													"value": {
+														"value": "@item().ExternalStorageFile",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataFactoryName": {
+													"value": {
+														"value": "@pipeline().DataFactory",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineName": {
+													"value": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineRunId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerId": {
+													"value": {
+														"value": "@pipeline().TriggerId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerName": {
+													"value": {
+														"value": "@pipeline().TriggerName",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerTime": {
+													"value": {
+														"value": "@pipeline().TriggerTime",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerType": {
+													"value": {
+														"value": "@pipeline().TriggerType",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataRead": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.dataRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"DataWritten": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.dataWritten",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"FilesRead": {
+													"value": {
+														"value": "0",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"SourcePeakConnections": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.sourcePeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"SinkPeakConnections": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.sinkPeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"RowsRead": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.rowsRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"RowsCopied": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.rowsCopied",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"CopyDuration": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.copyDuration",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"Throughput": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.throughput",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"UsedDataIntegrationUnits": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.usedDataIntegrationUnits",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"UsedParallelCopies": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.usedParallelCopies",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"FeedKey": {
+													"value": {
+														"value": "@item().FeedKey",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"BatchRunId": {
+													"value": {
+														"value": "@pipeline().parameters.BatchRunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@item().IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"LogFilePath": {
+													"value": {
+														"value": "@activity('CSV to PQT Single').output.logFilePath",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Log Row Count Single",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Record Telemetry Single",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[SetIntegrationControlRowCount]",
+											"storedProcedureParameters": {
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@item().IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"OptionalDetail": {
+													"value": " ",
+													"type": "String"
+												},
+												"PipelineId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProcessStream": {
+													"value": "CSV2PQT",
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Set BatchProcess Close Error 9",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "CSV to PQT Single",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+											"storedProcedureParameters": {
+												"BatchProcessLogId": {
+													"value": {
+														"value": "@variables('BatchProcessLogId')",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"ErrorMessage": {
+													"value": {
+														"value": "@{activity('CSV to PQT Single').Error.Message}",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"SuccessFlag": {
+													"value": "0",
+													"type": "Int32"
+												},
+												"ErrorObject": {
+													"value": "3b Load to Parquet",
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Log CSV2PQT Merge",
+										"description": "",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "CSV to PQT Merge",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[SetIntegrationControlProcess]",
+											"storedProcedureParameters": {
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@item().IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"OptionalDetail": {
+													"value": "nothing",
+													"type": "String"
+												},
+												"PipelineId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProcessStream": {
+													"value": "CSV2PQT",
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Record Telemetry Merge",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Log CSV2PQT Merge",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[RecordTelemetry]",
+											"storedProcedureParameters": {
+												"FeedPath": {
+													"value": {
+														"value": "@item().ADLSFolder",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"TableName": {
+													"value": {
+														"value": "@item().ExternalStorageFile",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataFactoryName": {
+													"value": {
+														"value": "@pipeline().DataFactory",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineName": {
+													"value": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineRunId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerId": {
+													"value": {
+														"value": "@pipeline().TriggerId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerName": {
+													"value": {
+														"value": "@pipeline().TriggerName",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerTime": {
+													"value": {
+														"value": "@pipeline().TriggerTime",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerType": {
+													"value": {
+														"value": "@pipeline().TriggerType",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataRead": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.dataRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"DataWritten": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.dataWritten",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"FilesRead": {
+													"value": {
+														"value": "0",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"SourcePeakConnections": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.sourcePeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"SinkPeakConnections": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.sinkPeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"RowsRead": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.rowsRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"RowsCopied": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.rowsCopied",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"CopyDuration": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.copyDuration",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"Throughput": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.throughput",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"UsedDataIntegrationUnits": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.usedDataIntegrationUnits",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"UsedParallelCopies": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.usedParallelCopies",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"FeedKey": {
+													"value": {
+														"value": "@item().FeedKey",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"BatchRunId": {
+													"value": {
+														"value": "@pipeline().parameters.BatchRunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@item().IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"LogFilePath": {
+													"value": {
+														"value": "@activity('CSV to PQT Merge').output.logFilePath",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Log Row Count Merge",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Record Telemetry Merge",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[SetIntegrationControlRowCount]",
+											"storedProcedureParameters": {
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@item().IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"OptionalDetail": {
+													"value": " ",
+													"type": "String"
+												},
+												"PipelineId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProcessStream": {
+													"value": "CSV2PQT",
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "Set BatchProcess Close Error 8",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "CSV to PQT Merge",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+											"storedProcedureParameters": {
+												"BatchProcessLogId": {
+													"value": {
+														"value": "@variables('BatchProcessLogId')",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"ErrorMessage": {
+													"value": {
+														"value": "@{activity('CSV to PQT Merge').Error.Message}",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"SuccessFlag": {
+													"value": "0",
+													"type": "Int32"
+												},
+												"ErrorObject": {
+													"value": "3b Load to Parquet",
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference"
+										}
+									},
+									{
+										"name": "CSV to PQT Merge",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "CallMergeWebhook",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "ParquetSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "ParquetWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"enableSkipIncompatibleRow": true,
+											"logSettings": {
+												"enableCopyActivityLog": true,
+												"copyActivityLogSettings": {
+													"logLevel": "Warning",
+													"enableReliableLogging": false
+												},
+												"logLocationSettings": {
+													"linkedServiceName": {
+														"referenceName": "lsADLS",
+														"type": "LinkedServiceReference"
+													},
+													"path": "failed"
+												}
+											},
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "dsADLSfile_noheader",
+												"type": "DatasetReference",
+												"parameters": {
+													"blobfolder": {
+														"value": "@item().ADLSFolder",
+														"type": "Expression"
+													},
+													"blobcontainer": {
+														"value": "@item().ADLSContainerCSV",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@replace(item().ExternalStorageFile,'00001','Merge')",
+														"type": "Expression"
+													},
+													"storageuri": {
+														"value": "@pipeline().parameters.StorageURI",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsADLSFileParquet",
+												"type": "DatasetReference",
+												"parameters": {
+													"blobfolder": {
+														"value": "@item().ADLSFolder",
+														"type": "Expression"
+													},
+													"blobcontainer": {
+														"value": "@variables('ParquetContainer')",
+														"type": "Expression"
+													},
+													"filename": {
+														"value": "@item().ExternalStorageFilePQT",
+														"type": "Expression"
+													},
+													"storageuri": {
+														"value": "@pipeline().parameters.StorageURI",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Delete Merge File",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Log Row Count Merge",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "dsADLSfile",
+												"type": "DatasetReference",
+												"parameters": {
+													"blobfolder": {
+														"value": "@item().ADLSFolder",
+														"type": "Expression"
+													},
+													"blobcontainer": "@item().ADLSContainerCSV",
+													"FileName": "@replace(item().ExternalStorageFile,'00001','Merge')"
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true
+											}
+										}
+									},
+									{
+										"name": "CallMergeWebhook",
+										"description": "Generates PS Container Listing",
+										"type": "WebHook",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"url": {
+												"value": "@pipeline().parameters.WebhookURL",
+												"type": "Expression"
+											},
+											"method": "POST",
+											"headers": {
+												"Content-Type": "application/json"
+											},
+											"body": {
+												"value": "@json(\nconcat('{\n\"ContainerName\":\"',pipeline().parameters.Container,'\",',\n'\"ConnectionName\":\"',pipeline().parameters.ConnectionName,'\",',\n'\"StorageAccName\":\"',pipeline().parameters.StorageAccName,'\",',\n'\"FolderName\":\"',item().ADLSFolder,'\",',\n'\"FeedName\":\"',replace(item().ExternalStorageFile,'_00001.csv',''),'\"\n}'\n))\n",
+												"type": "Expression"
+											},
+											"timeout": "00:06:00",
+											"reportStatusOnCallBack": false
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set Integration Control Items",
+				"description": "",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Pause 1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetIntegrationControlBatch]",
+					"storedProcedureParameters": {
+						"BatchGroupId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchGroupId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"BatchRunId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRunId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"BatchRunModeId": {
+							"value": {
+								"value": "@pipeline().parameters.RunMode",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"Container": {
+							"value": {
+								"value": "@pipeline().parameters.Container",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"DataFactoryName": {
+							"value": {
+								"value": "@pipeline().DataFactory",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineName": {
+							"value": {
+								"value": "@pipeline().Pipeline",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineRunId": {
+							"value": {
+								"value": "@pipeline().RunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineTriggerId": {
+							"value": {
+								"value": "@pipeline().TriggerId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"PipelineTriggerName": {
+							"value": {
+								"value": "@pipeline().TriggerName",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"StorageURI": {
+							"value": {
+								"value": "@pipeline().parameters.StorageURI",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Pause 2",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "Set Integration Control Items",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 1
+				}
+			},
+			{
+				"name": "Set FinOps File List",
+				"description": "",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Prepare Integration Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].SetFinOpsFileList"
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Pause 1",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "Set FinOps File List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 1
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error5",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Load to Parquet",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('Load to Parquet').Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "3b Load to Parquet",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Prepare Integration Metadata",
+				"description": "",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Set BatchProcessLogId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].SetMetadataPreIntegration"
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Check for Skipped Row Errors",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Set BatchProcess Close",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogWarning]",
+					"storedProcedureParameters": {
+						"BatchRunId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ProcessStream": {
+							"value": {
+								"value": "@variables('ProcessStream')",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 11
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 1010
+			},
+			"RunMode": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"Container": {
+				"type": "string",
+				"defaultValue": "dynamics365-financeandoperations"
+			},
+			"StorageURI": {
+				"type": "string",
+				"defaultValue": "https://edptestrtkdls001.dfs.core.windows.net"
+			},
+			"WebhookURL": {
+				"type": "string",
+				"defaultValue": "https://5564e5df-1e10-4a1d-afb6-fd0db071ce9d.webhook.ne.azure-automation.net/webhooks?token=%2bcbBBoxif3ySR0O%2bibFQSTr2smaSo9N%2bl39VTfL5OHI%3d"
+			},
+			"ConnectionName": {
+				"type": "string",
+				"defaultValue": "DefaultEndpointsProtocol=https;AccountName=edptestrtkdls001;AccountKey=07ilFZhkANjR9hZXWRu8T0RGLKLPdm29Hmj1UI+gl2WiQc0NvpTEZeztMFD2QgZDU21gJACtwicXZR67ta60wQ==;EndpointSuffix=core.windows.net"
+			},
+			"StorageAccName": {
+				"type": "string",
+				"defaultValue": "edptestrtkdls001"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "CSV2PQT"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			},
+			"ParquetContainer": {
+				"type": "String",
+				"defaultValue": "finopsparquet"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"finops bulk loading"
+		],
+		"lastPublishTime": "2021-07-31T19:57:26Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

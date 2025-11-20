@@ -1,0 +1,889 @@
+{
+	"name": "4_StageToWarehouse",
+	"properties": {
+		"description": "stage to transform to warehouse \n\n[Process Stream STG2TRN]\n[Process Stream TRN2WAR]\n\nthis pipeline will almost definitely end up being split into 4a/4b",
+		"activities": [
+			{
+				"name": "LookupDimProcs",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set BatchProcessLogId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetMergeFeed]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"WarehouseGroup": {
+								"type": "String",
+								"value": "Dim"
+							},
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Set BatchProcessLogId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogProcessStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchProcessLogId",
+					"value": {
+						"value": "@activity('LogProcessStart').output.firstrow.NewProcessId",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "RunModeTypeSwitch",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": " ",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogProcessStart",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetBatchProcessLog]",
+						"storedProcedureParameters": {
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							},
+							"NewProcessId": {
+								"type": "Int32",
+								"value": "0"
+							},
+							"ProcessBatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"ProcessDataFactoryName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().DataFactory",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineRunId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								}
+							},
+							"ProcessRunMode": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.RunMode",
+									"type": "Expression"
+								}
+							},
+							"ProcessStreamCode": {
+								"type": "String",
+								"value": {
+									"value": "@variables('ProcessStream')",
+									"type": "Expression"
+								}
+							},
+							"ProcessTriggerId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error2",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "LookupDimProcs",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('LookupDimProcs').Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "4 Update Dims",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": "devmdpsq1001.database.windows.net",
+						"dbname": "devmdpdb1001"
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error3",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "RunModeTypeSwitch",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('RunModeTypeSwitch').Error.Message}\n ",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "4 Copy Event Metadata",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "LookupFactProcs",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "LookupDimProcs",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetMergeFeed]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"WarehouseGroup": {
+								"type": "String",
+								"value": "Fact"
+							},
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error5",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "LookupFactProcs",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('LookupFactProcs').Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "4 Update Facts",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "RunModeTypeSwitch",
+				"description": "runs Default if does not match a case. so if run 2 or 3 will not run this",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "LookupFactProcs",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.RunMode",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "0",
+							"activities": [
+								{
+									"name": "Wait - Not required for serverless",
+									"type": "Wait",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"waitTimeInSeconds": 5
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Update CDC Metadata",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetCDCMetadata]",
+								"storedProcedureParameters": {
+									"BatchGroupId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchGroupId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"BatchRunId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchRunId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Update Events Metadata",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy Event Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetEventWarehouseMetadata]",
+								"storedProcedureParameters": {
+									"BatchRunId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchRunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Copy Event Metadata",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Update CDC Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlDWSource",
+									"additionalColumns": [
+										{
+											"name": "WarehouseSource",
+											"value": {
+												"value": "Synapse MDP",
+												"type": "Expression"
+											}
+										}
+									],
+									"sqlReaderQuery": "SELECT *\n  FROM [app].[SynapseEvent]\nWHERE [RunId] is not null and  [BatchId] is not null",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "upsert",
+									"upsertSettings": {
+										"useTempDB": false,
+										"keys": [
+											"EventKey"
+										],
+										"interimSchemaName": "temp"
+									},
+									"sqlWriterUseTableLock": false,
+									"disableMetricsCollection": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "EventKey",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "EventKey",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "FeedKey",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "FeedKey",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "BatchId",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "BatchGroupId",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "StepId",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "StepId",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "Measurement",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "Measurement",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "Event",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "Event",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "RowsAffected",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "RowsAffected",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "EventDurationInMs",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "EventDurationInMs",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "EventDateTime",
+												"type": "DateTime",
+												"physicalType": "datetime2"
+											},
+											"sink": {
+												"name": "EventDateTime",
+												"type": "DateTime",
+												"physicalType": "datetime2"
+											}
+										},
+										{
+											"source": {
+												"name": "WarehouseSource"
+											},
+											"sink": {
+												"name": "WarehouseSource",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "RunId"
+											},
+											"sink": {
+												"name": "BatchRunId"
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsSynapse",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.workspace",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.sqlpool",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "dummy"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "app",
+										"table": "WarehouseEvent"
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 7
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 1105
+			},
+			"RunMode": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "hapmdpappdbdev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "hapsqlserverdev.database.windows.net"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"sqlpool": {
+				"type": "string"
+			},
+			"workspace": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "STG2WAR"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPCore"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T19:54:37Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

@@ -1,0 +1,1190 @@
+{
+	"name": "14_ProcessOndemandtoSQLPool",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetDimTables",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Unpause Using SQL Pool Mode",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get OnDemandDatabase from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlDWSource",
+						"sqlReaderQuery": "select  \n'warehouse' as target_schema \n,o.name as target_object\n\n,'warehouse' as source_schema \n,o.name as source_object \n\n,c.name as primary_key\n\n\nfrom sys.all_objects as o\n\nLEFT OUTER JOIN sys.all_columns c\nON o.object_id = c.object_id\nand c.name like '%_pk'  \n\nwhere o.type = 'V'\nand o.schema_id = schema_id('warehouse')\nand o.name like 'dim_care%' \n--and 1<>1\n\ngroup by \no.name\n,c.name",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsOnDemand",
+						"type": "DatasetReference",
+						"parameters": {
+							"OnDemandServer": {
+								"value": "@concat(activity('Get OnDemandServer from Azure Key Vault').output,'-ondemand.sql.azuresynapse.net')",
+								"type": "Expression"
+							},
+							"OnDemandDatabase": {
+								"value": "@activity('Get OnDemandDatabase from Azure Key Vault').output",
+								"type": "Expression"
+							},
+							"Schema": "sys",
+							"Object": "all_objects"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Get OnDemandDatabase from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get OnDemandServer from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/ondemanddatabase?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get OnDemandServer from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get storageuri from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/workspace?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "IterateDims",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetDimTables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetDimTables').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "SourceDeltaDims",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Truncate and build table dim",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "ParquetSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									}
+								},
+								"sink": {
+									"type": "SqlDWSink",
+									"allowPolyBase": true,
+									"polyBaseSettings": {
+										"rejectValue": 0,
+										"rejectType": "value",
+										"useTypeDefault": true
+									},
+									"disableMetricsCollection": false
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "dsParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().target_object,'.parquet')",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsSynapse",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@concat('tcp:',activity('Get OnDemandServer from Azure Key Vault').output,'.sql.azuresynapse.net,1433')",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+											"type": "Expression"
+										},
+										"schema": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"table": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Truncate and build table dim",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "LookupTableDefDims",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[trun_create_warehouse_tables]",
+								"storedProcedureParameters": {
+									"schema_name": {
+										"value": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"table_name": {
+										"value": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsSynapse",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"Server": {
+										"value": "@concat('tcp:',activity('Get OnDemandServer from Azure Key Vault').output,'.sql.azuresynapse.net,1433')",
+										"type": "Expression"
+									},
+									"DB": {
+										"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "LookupTableDefDims",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 3,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlDWSource",
+									"additionalColumns": [
+										{
+											"name": "object_name",
+											"value": {
+												"value": "@item().target_object",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "object_schema",
+											"value": {
+												"value": "@item().target_schema",
+												"type": "Expression"
+											}
+										}
+									],
+									"sqlReaderStoredProcedureName": "[app].[create_warehouse_tables]",
+									"storedProcedureParameters": {
+										"object_name": {
+											"type": "String",
+											"value": {
+												"value": "@item().target_object",
+												"type": "Expression"
+											}
+										},
+										"object_schema": {
+											"type": "String",
+											"value": {
+												"value": "@item().target_schema",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "SqlDWSink",
+									"writeBehavior": "Upsert",
+									"upsertSettings": {
+										"keys": [
+											"name_schema",
+											"name_table"
+										],
+										"interimSchemaName": ""
+									},
+									"sqlWriterUseTableLock": false
+								},
+								"enableStaging": true,
+								"stagingSettings": {
+									"linkedServiceName": {
+										"referenceName": "lsADLS",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"storageurl": {
+												"value": "@activity('Get storageuri from Azure Key Vault').output",
+												"type": "Expression"
+											}
+										}
+									},
+									"path": "staging"
+								},
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "object_schema"
+											},
+											"sink": {
+												"name": "name_schema"
+											}
+										},
+										{
+											"source": {
+												"name": "object_name"
+											},
+											"sink": {
+												"name": "name_table"
+											}
+										},
+										{
+											"source": {
+												"name": "table_definition"
+											},
+											"sink": {
+												"name": "table_definition"
+											}
+										},
+										{
+											"source": {
+												"name": "external_table_definition"
+											},
+											"sink": {
+												"name": "external_table_definition"
+											}
+										},
+										{
+											"source": {
+												"name": "openrowset_definition"
+											},
+											"sink": {
+												"name": "openrowset_definition"
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsOnDemand",
+									"type": "DatasetReference",
+									"parameters": {
+										"OnDemandServer": "mvpssotmdpsw1001-ondemand.sql.azuresynapse.net",
+										"OnDemandDatabase": "MDPOndemand",
+										"Schema": {
+											"value": "@item().source_schema",
+											"type": "Expression"
+										},
+										"Object": {
+											"value": "@item().source_object",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsSynapse",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@concat('tcp:',activity('Get OnDemandServer from Azure Key Vault').output,'.sql.azuresynapse.net,1433')",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+											"type": "Expression"
+										},
+										"schema": "app",
+										"table": "warehouse_table_definition"
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Get storageuri from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/storageuri?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "GetFactTables",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "IterateDims",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlDWSource",
+						"sqlReaderQuery": "select \n'warehouse' as target_schema \n,o.name as target_object\n\n,'sqlpool' as source_schema \n,o.name as source_object \n\n,c.name as primary_key\n\nfrom sys.all_objects as o\n\nLEFT OUTER JOIN sys.all_columns c\nON o.object_id = c.object_id\nand c.name like 'fact_%_pk'\n\nwhere o.type = 'V'\nand o.schema_id = schema_id('sqlpool')\nand o.name like 'fact_%' \n--and 1<>1\n\ngroup by \no.name\n,c.name",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsOnDemand",
+						"type": "DatasetReference",
+						"parameters": {
+							"OnDemandServer": {
+								"value": "@concat(activity('Get OnDemandServer from Azure Key Vault').output,'-ondemand.sql.azuresynapse.net')",
+								"type": "Expression"
+							},
+							"OnDemandDatabase": {
+								"value": "@activity('Get OnDemandDatabase from Azure Key Vault').output",
+								"type": "Expression"
+							},
+							"Schema": "sys",
+							"Object": "all_objects"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Unpause Using SQL Pool Mode",
+				"description": " ",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get RG from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get sqlpool from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.pause_sqlpool,1)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 60
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "ResumeSQLPool_SQLDWGen2",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@concat('https://management.azure.com/subscriptions/',activity('Get SubId from Azure Key Vault').output.value,'/resourceGroups/',activity('Get RG from Azure Key Vault').output.value,'/providers/Microsoft.Sql/servers/',activity('Get workspace from Azure Key Vault').output.value,'/databases/',activity('Get sqlpool from Azure Key Vault').output.value,'/resume?api-version=2014-04-01-preview')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "POST",
+								"body": {
+									"value": "@concat('{','}')",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.core.windows.net"
+								}
+							}
+						},
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "ResumeSQLPool_SQLDWGen2",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 60
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Pause Using SQL Pool Mode",
+				"description": "",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "IterateFacts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.pause_sqlpool,1)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait4",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "PauseSQLPool_SQLDWGen2",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@concat('https://management.azure.com/subscriptions/',activity('Get SubId from Azure Key Vault').output.value,'/resourceGroups/',activity('Get RG from Azure Key Vault').output.value,'/providers/Microsoft.Sql/servers/',activity('Get workspace from Azure Key Vault').output.value,'/databases/',activity('Get sqlpool from Azure Key Vault').output.value,'/pause?api-version=2014-04-01-preview')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "POST",
+								"body": {
+									"value": "@concat('{','}')",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.core.windows.net"
+								}
+							}
+						},
+						{
+							"name": "Wait3",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "PauseSQLPool_SQLDWGen2",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get SubId from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/subid?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get RG from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get SubId from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/resourcegroup?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get sqlpool from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get workspace from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/sqlpool?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get workspace from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/workspace?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "IterateFacts",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetFactTables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetFactTables').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "SourceDeltaFacts",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Truncate and build table fact",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "ParquetSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									}
+								},
+								"sink": {
+									"type": "SqlDWSink",
+									"allowPolyBase": true,
+									"polyBaseSettings": {
+										"rejectValue": 0,
+										"rejectType": "value",
+										"useTypeDefault": true
+									},
+									"disableMetricsCollection": false
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "dsParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().target_object,'.parquet')",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsSynapse",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@concat('tcp:',activity('Get OnDemandServer from Azure Key Vault').output,'.sql.azuresynapse.net,1433')",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+											"type": "Expression"
+										},
+										"schema": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"table": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Truncate and build table fact",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "LookupTableDefFacts",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[trun_create_warehouse_tables]",
+								"storedProcedureParameters": {
+									"schema_name": {
+										"value": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"table_name": {
+										"value": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsSynapse",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"Server": {
+										"value": "@concat('tcp:',activity('Get OnDemandServer from Azure Key Vault').output,'.sql.azuresynapse.net,1433')",
+										"type": "Expression"
+									},
+									"DB": {
+										"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "LookupTableDefFacts",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 3,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlDWSource",
+									"additionalColumns": [
+										{
+											"name": "object_name",
+											"value": {
+												"value": "@item().target_object",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "object_schema",
+											"value": {
+												"value": "@item().target_schema",
+												"type": "Expression"
+											}
+										}
+									],
+									"sqlReaderStoredProcedureName": "[app].[create_warehouse_tables]",
+									"storedProcedureParameters": {
+										"object_name": {
+											"type": "String",
+											"value": {
+												"value": "@item().target_object",
+												"type": "Expression"
+											}
+										},
+										"object_schema": {
+											"type": "String",
+											"value": {
+												"value": "@item().target_schema",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "SqlDWSink",
+									"writeBehavior": "Upsert",
+									"upsertSettings": {
+										"keys": [
+											"name_schema",
+											"name_table"
+										],
+										"interimSchemaName": ""
+									},
+									"sqlWriterUseTableLock": false
+								},
+								"enableStaging": true,
+								"stagingSettings": {
+									"linkedServiceName": {
+										"referenceName": "lsADLS",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"storageurl": {
+												"value": "@activity('Get storageuri from Azure Key Vault').output",
+												"type": "Expression"
+											}
+										}
+									},
+									"path": "staging"
+								},
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "object_schema"
+											},
+											"sink": {
+												"name": "name_schema"
+											}
+										},
+										{
+											"source": {
+												"name": "object_name"
+											},
+											"sink": {
+												"name": "name_table"
+											}
+										},
+										{
+											"source": {
+												"name": "table_definition"
+											},
+											"sink": {
+												"name": "table_definition"
+											}
+										},
+										{
+											"source": {
+												"name": "external_table_definition"
+											},
+											"sink": {
+												"name": "external_table_definition"
+											}
+										},
+										{
+											"source": {
+												"name": "openrowset_definition"
+											},
+											"sink": {
+												"name": "openrowset_definition"
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsOnDemand",
+									"type": "DatasetReference",
+									"parameters": {
+										"OnDemandServer": "mvpssotmdpsw1001-ondemand.sql.azuresynapse.net",
+										"OnDemandDatabase": "MDPOndemand",
+										"Schema": {
+											"value": "@item().source_schema",
+											"type": "Expression"
+										},
+										"Object": {
+											"value": "@item().source_object",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsSynapse",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@concat('tcp:',activity('Get OnDemandServer from Azure Key Vault').output,'.sql.azuresynapse.net,1433')",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+											"type": "Expression"
+										},
+										"schema": "app",
+										"table": "warehouse_table_definition"
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"pause_sqlpool": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"KeyVault": {
+				"type": "string",
+				"defaultValue": "devslpmdpkv1001"
+			}
+		},
+		"folder": {
+			"name": "MDPOnDemand"
+		},
+		"annotations": []
+	}
+}

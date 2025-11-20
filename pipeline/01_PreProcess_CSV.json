@@ -1,0 +1,466 @@
+{
+	"name": "01_PreProcess_CSV",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetFeedMetadata",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetExtractFeedList]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupID",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach Feed",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetFeedMetadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetFeedMetadata').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "GetADLSDir",
+							"type": "SynapseNotebook",
+							"dependsOn": [
+								{
+									"activity": "Get SearchTerm",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "GetCSVParams",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebook": {
+									"referenceName": "01_PreProcess_CSV_FileList",
+									"type": "NotebookReference"
+								},
+								"parameters": {
+									"account_name": {
+										"value": {
+											"value": "@item().FriendlyServerName",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"container_name": {
+										"value": {
+											"value": "@item().DBName",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"data_source": {
+										"value": {
+											"value": "@concat(item().SourceSchema,'/input/')",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"feed_folder": {
+										"value": {
+											"value": "@item().SourceTable",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"search_term": {
+										"value": {
+											"value": "@activity('Get SearchTerm').output.firstRow.FileStructure",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"escape_char": {
+										"value": {
+											"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).EscapeCharacter",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"quote_char": {
+										"value": {
+											"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).QuoteCharacter",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"fileextension": {
+										"value": {
+											"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).FileExtension",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"delimiter": {
+										"value": {
+											"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).ColumnDelimiter",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"search_start": {
+										"value": {
+											"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).SearchStart",
+											"type": "Expression"
+										},
+										"type": "string"
+									}
+								},
+								"snapshot": true,
+								"sparkPool": {
+									"referenceName": {
+										"value": "@pipeline().parameters.mdpsparkpool",
+										"type": "Expression"
+									},
+									"type": "bigDataPoolReference"
+								}
+							}
+						},
+						{
+							"name": "01a PreProcess CSV Output",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "GetADLSDir",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "01a_PreProcess_CSV_Output",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"Level_Above_List": {
+										"value": "@json(activity('GetADLSDir').output.status.Output.result.exitValue)",
+										"type": "Expression"
+									},
+									"container": {
+										"value": "@item().DBName",
+										"type": "Expression"
+									},
+									"parentfolders": {
+										"value": "@concat(item().SourceSchema,'/input/')",
+										"type": "Expression"
+									},
+									"datastartrow": {
+										"value": "0",
+										"type": "Expression"
+									},
+									"feed_folder": {
+										"value": "@item().SourceTable",
+										"type": "Expression"
+									},
+									"storage_uri": {
+										"value": "@item().ServerName",
+										"type": "Expression"
+									},
+									"FeedKey": {
+										"value": "@item().FeedKey",
+										"type": "Expression"
+									},
+									"CompressionType": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).CompressionType",
+										"type": "Expression"
+									},
+									"ColumnDelimiter": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).ColumnDelimiter",
+										"type": "Expression"
+									},
+									"RowDelimiter": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).RowDelimiter",
+										"type": "Expression"
+									},
+									"Encoding": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).Encoding",
+										"type": "Expression"
+									},
+									"EscapeCharacter": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).EscapeCharacter",
+										"type": "Expression"
+									},
+									"QuoteCharacter": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).QuoteCharacter",
+										"type": "Expression"
+									},
+									"FirstRowAsHeader": {
+										"value": "@bool(json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).FirstRowAsHeader)",
+										"type": "Expression"
+									},
+									"NullValue": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).NullValue",
+										"type": "Expression"
+									},
+									"CompressionLevel": {
+										"value": "@json(string(activity('GetCSVParams').output.firstrow.CustomExtractQuery)).CompressionLevel",
+										"type": "Expression"
+									},
+									"BatchGroupID": {
+										"value": "@pipeline().parameters.BatchGroupID",
+										"type": "Expression"
+									},
+									"mdpserver": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"mdpdb": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									},
+									"BatchRunID": {
+										"value": "@pipeline().parameters.BatchRunID",
+										"type": "Expression"
+									},
+									"BatchProcessLogID": {
+										"value": "@pipeline().parameters.BatchProcessLogID",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "GetCSVParams",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT [CustomExtractQuery] \nFROM app.feed \nWHERE [FeedKey] = '@{item().FeedKey}'\nAND [BatchGroupID] = '@{pipeline().parameters.BatchGroupID}'",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Set BatchProcess Close Error",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "GetADLSDir",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchProcessLogId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('GetADLSDir').Error.Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "01 GetADLSDir Runbook",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Get SearchTerm",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT [FileStructure] \nFROM app.feed \nWHERE [FeedKey] = '@{item().FeedKey}'\nAND [BatchGroupID] = '@{pipeline().parameters.BatchGroupID}'",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								},
+								"firstRowOnly": true
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "lbs-sqldb-mdp-dev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "lbs-sql-mdp-dev.database.windows.net"
+			},
+			"BatchGroupID": {
+				"type": "int",
+				"defaultValue": 2
+			},
+			"BatchRunID": {
+				"type": "int",
+				"defaultValue": 29999
+			},
+			"BatchProcessLogID": {
+				"type": "int",
+				"defaultValue": 92222
+			},
+			"mdpsparkpool": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "MDPPreProcess"
+		},
+		"annotations": []
+	}
+}

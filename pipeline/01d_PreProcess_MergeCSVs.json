@@ -1,0 +1,526 @@
+{
+	"name": "01d_PreProcess_MergeCSVs",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get raw files",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "dsADLSfolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"blobfolder": {
+								"value": "@pipeline().parameters.folder",
+								"type": "Expression"
+							},
+							"blobcontainer": {
+								"value": "@pipeline().parameters.container",
+								"type": "Expression"
+							},
+							"storageuri": {
+								"value": "@pipeline().parameters.storage_uri",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "ForEach File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get raw files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "GetCSVParams",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get raw files').output.childItems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Copy ADLS To Global TempTable",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Mapping",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.04:00:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 300,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "insert",
+									"sqlWriterUseTableLock": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"value": "@activity('Mapping').output",
+									"type": "Expression"
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsADLSfile",
+									"type": "DatasetReference",
+									"parameters": {
+										"blobfolder": {
+											"value": "@pipeline().parameters.folder",
+											"type": "Expression"
+										},
+										"blobcontainer": {
+											"value": "@pipeline().parameters.container",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@pipeline().parameters.storage_uri",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "tempdb",
+										"table": {
+											"value": "@concat('##',replace(string(pipeline().parameters.PipelineRunID),'-','_'),'_',string(pipeline().parameters.BatchGroupID),'_',string(pipeline().parameters.FeedKey),'_Temp')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Mapping",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "dsADLSfile",
+									"type": "DatasetReference",
+									"parameters": {
+										"blobfolder": {
+											"value": "@pipeline().parameters.folder",
+											"type": "Expression"
+										},
+										"blobcontainer": {
+											"value": "@pipeline().parameters.container",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@pipeline().parameters.storage_uri",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"structure"
+								],
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "Set BatchProcess Close Error",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy ADLS To Global TempTable",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchProcessLogId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('Copy ADLS To Global TempTable').Error.Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "01d Copy ADLS to Global TempTable",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Create Parquet from Merged files",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "ForEach File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat('SELECT DISTINCT * FROM tempdb..##',replace(string(pipeline().parameters.PipelineRunID),'-','_'),'_',string(pipeline().parameters.BatchGroupID),'_',string(pipeline().parameters.FeedKey),'_Temp')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "tempdb",
+							"table": "Dummy"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "dsADLSFileParquet",
+						"type": "DatasetReference",
+						"parameters": {
+							"blobfolder": {
+								"value": "@replace(replace(pipeline().parameters.folder,'raw','output'),concat('/',pipeline().parameters.feed_folder),'')",
+								"type": "Expression"
+							},
+							"blobcontainer": {
+								"value": "@pipeline().parameters.container",
+								"type": "Expression"
+							},
+							"filename": {
+								"value": "@concat(pipeline().parameters.feed_folder,'.parquet')",
+								"type": "Expression"
+							},
+							"storageuri": {
+								"value": "@pipeline().parameters.storage_uri",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Set BatchProcess Close Error 2",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Create Parquet from Merged files",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchProcessLogId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@activity('Create Parquet from Merged files').Error.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "01d Create Parquet from Merged Files",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "GetCSVParams",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT [CustomExtractQuery] \nFROM app.feed \nWHERE [FeedKey] = '@{pipeline().parameters.FeedKey}'\nAND [BatchGroupID] = '@{pipeline().parameters.BatchGroupID}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": true
+				}
+			}
+		],
+		"parameters": {
+			"FeedKey": {
+				"type": "int",
+				"defaultValue": 20014
+			},
+			"container": {
+				"type": "string",
+				"defaultValue": "landing"
+			},
+			"folder": {
+				"type": "string",
+				"defaultValue": "schoolcensus/raw/pupil"
+			},
+			"storage_uri": {
+				"type": "string",
+				"defaultValue": "https://lbsstdatalake001.dfs.core.windows.net"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "lbs-sqldb-mdp-dev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "lbs-sql-mdp-dev.database.windows.net"
+			},
+			"BatchGroupID": {
+				"type": "string",
+				"defaultValue": "2"
+			},
+			"PipelineRunID": {
+				"type": "string",
+				"defaultValue": "a9126fd8-6b2e-4bb7-b4a0-9b21535f5dac"
+			},
+			"feed_folder": {
+				"type": "string",
+				"defaultValue": "pupil"
+			},
+			"BatchRunID": {
+				"type": "int",
+				"defaultValue": 29998
+			},
+			"BatchProcessLogID": {
+				"type": "int",
+				"defaultValue": 92228
+			}
+		},
+		"variables": {
+			"Error": {
+				"type": "Boolean"
+			},
+			"StructureString": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "MDPPreProcess"
+		},
+		"annotations": []
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

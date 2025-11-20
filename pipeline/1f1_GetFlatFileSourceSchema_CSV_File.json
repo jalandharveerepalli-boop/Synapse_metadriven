@@ -1,0 +1,476 @@
+{
+	"name": "1f1_GetFlatFileSourceSchema_CSV_File",
+	"properties": {
+		"activities": [
+			{
+				"name": "ExtractMetaColumns",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetMetadataFile",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetMetadataFile').output.structure",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Set Table Schema",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[app].[SetTempSourceSchemaColumns]",
+									"storedProcedureParameters": {
+										"Table": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.file",
+												"type": "Expression"
+											}
+										},
+										"Column": {
+											"type": "String",
+											"value": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										},
+										"DataType": {
+											"type": "String",
+											"value": {
+												"value": "@item().type",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "Set Table Schema",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "GetMetadataFile",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "ResetTempSourceSchema",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ResetColumnID",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "dsSourceFolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"storageuri": {
+								"value": "@pipeline().parameters.storageuri",
+								"type": "Expression"
+							},
+							"container": {
+								"value": "@pipeline().parameters.container",
+								"type": "Expression"
+							},
+							"directory": {
+								"value": "@pipeline().parameters.folder",
+								"type": "Expression"
+							},
+							"file": {
+								"value": "@pipeline().parameters.file",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"structure"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings",
+						"skipLineCount": {
+							"value": "@pipeline().parameters.headerskiplines",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "ResetTempSourceSchema",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[ReSetTempSourceSchema]"
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "ExtractMetaDataTypes",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetMetadataFileTypes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetMetadataFileTypes').output.structure",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "UpdateColumnDataType",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[app].[SetTempSourceSchemaColumnDataType]",
+									"storedProcedureParameters": {
+										"Table": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.file",
+												"type": "Expression"
+											}
+										},
+										"DataType": {
+											"type": "String",
+											"value": {
+												"value": "@item().type",
+												"type": "Expression"
+											}
+										},
+										"ColumnId": {
+											"type": "Int32",
+											"value": {
+												"value": "@int(variables('ColumnId'))",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "SetTempID",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "UpdateColumnDataType",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "TempId",
+								"value": {
+									"value": "@string(add(int(variables('ColumnId')), 1))",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "SetColumnID",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "SetTempID",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ColumnId",
+								"value": {
+									"value": "@variables('TempId')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "UpdateColumnDataType",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "GetMetadataFileTypes",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "ExtractMetaColumns",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "dsSourceFolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"storageuri": {
+								"value": "@pipeline().parameters.storageuri",
+								"type": "Expression"
+							},
+							"container": {
+								"value": "@pipeline().parameters.container",
+								"type": "Expression"
+							},
+							"directory": {
+								"value": "@pipeline().parameters.folder",
+								"type": "Expression"
+							},
+							"file": {
+								"value": "@pipeline().parameters.file",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"structure"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings",
+						"skipLineCount": {
+							"value": "@pipeline().parameters.datatypeskiplines",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "ResetColumnID",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ColumnId",
+					"value": {
+						"value": "1",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 3
+			},
+			"BatchRunId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"BatchProcessLogId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "hapmdpappdbdev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "hapsqlserverdev.database.windows.net"
+			},
+			"keyvaultdnsname": {
+				"type": "string",
+				"defaultValue": "hapkeyvaultdev"
+			},
+			"storageuri": {
+				"type": "string",
+				"defaultValue": "https://hapdatastorageactdev.dfs.core.windows.net"
+			},
+			"container": {
+				"type": "string",
+				"defaultValue": "import"
+			},
+			"folder": {
+				"type": "string",
+				"defaultValue": "MSLearn"
+			},
+			"file": {
+				"type": "string",
+				"defaultValue": "Achievements.csv"
+			},
+			"headerskiplines": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"datatypeskiplines": {
+				"type": "int",
+				"defaultValue": 1
+			}
+		},
+		"variables": {
+			"ColumnId": {
+				"type": "String",
+				"defaultValue": "1"
+			},
+			"TempId": {
+				"type": "String",
+				"defaultValue": "1"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": []
+	}
+}

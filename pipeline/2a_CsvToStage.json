@@ -1,0 +1,803 @@
+{
+	"name": "2a_CsvToStage",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Files To Load",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "dsSourceFolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"storageuri": {
+								"value": "@pipeline().parameters.storageuri",
+								"type": "Expression"
+							},
+							"container": {
+								"value": "@pipeline().parameters.container",
+								"type": "Expression"
+							},
+							"directory": {
+								"value": "@concat('','')",
+								"type": "Expression"
+							},
+							"file": {
+								"value": "@concat('','')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "Load each file",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Files To Load",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Files To Load').output.childItems",
+						"type": "Expression"
+					},
+					"batchCount": 25,
+					"activities": [
+						{
+							"name": "Get File Columns",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "dsLoadFile",
+									"type": "DatasetReference",
+									"parameters": {
+										"storageuri": {
+											"value": "@pipeline().parameters.storageuri",
+											"type": "Expression"
+										},
+										"container": {
+											"value": "@pipeline().parameters.container",
+											"type": "Expression"
+										},
+										"directory": {
+											"value": "@concat('','')",
+											"type": "Expression"
+										},
+										"file": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"structure",
+									"lastModified",
+									"itemName"
+								],
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "Get Load Table",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Get File Columns",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlDWSource",
+									"sqlReaderStoredProcedureName": "[app].[sp_GetTableForSchema]",
+									"storedProcedureParameters": {
+										"json": {
+											"type": "String",
+											"value": {
+												"value": "@string(activity('Get File Columns').output.Structure)",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsSynapse",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@concat('tcp:',pipeline().parameters.workspace,'.sql.azuresynapse.net,1433')",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.sqlpool",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "dummy"
+									}
+								}
+							}
+						},
+						{
+							"name": "Check For Table",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Get Load Table",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@contains(activity('Get Load Table').output, 'firstRow')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Move File to failed",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "BinarySource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "BinaryReadSettings"
+												}
+											},
+											"sink": {
+												"type": "BinarySink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												}
+											},
+											"enableStaging": false
+										},
+										"inputs": [
+											{
+												"referenceName": "dsLoadFileBinary",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsFailedFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"directory": {
+														"value": "@formatDateTime(trigger().startTime,'dd-MM-yyyy')",
+														"type": "Expression"
+													},
+													"file": {
+														"value": "@item().name",
+														"type": "Expression"
+													},
+													"container": "failed",
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Delete from import",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Move File to failed",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "dsLoadFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													},
+													"container": "import",
+													"directory": {
+														"value": "@concat('','')",
+														"type": "Expression"
+													},
+													"file": {
+														"value": "@item().name",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true
+											}
+										}
+									},
+									{
+										"name": "Notify Mapping Failure",
+										"type": "WebActivity",
+										"dependsOn": [
+											{
+												"activity": "Delete from import",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"url": {
+												"value": "@variables('Teams')",
+												"type": "Expression"
+											},
+											"connectVia": {
+												"referenceName": "AutoResolveIntegrationRuntime",
+												"type": "IntegrationRuntimeReference"
+											},
+											"method": "POST",
+											"headers": {
+												"Content-Type": "application/json"
+											},
+											"body": {
+												"value": "{\"@@context\":\"http://schema.org/extensions\",\"@@type\":\"MessageCard\",\"sections\":[{\"activityImage\":\"https://assets.us.ovhcloud.com/sites/default/files/medias/images/why/cert_HDS.jpg\",\"activitySubtitle\":\"\",\"activityText\":\"Could not load file - @{item().name}\",\"activityTitle\":\"CSV File FAILED to map to a  staging table are the columns right?  @{item().name}\"}],\"summary\":\"test\",\"themeColor\":\"#FF0000\"}",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Move to Failed",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "Import File",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "BinarySource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "BinaryReadSettings"
+												}
+											},
+											"sink": {
+												"type": "BinarySink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												}
+											},
+											"enableStaging": false
+										},
+										"inputs": [
+											{
+												"referenceName": "dsLoadFileBinary",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsFailedFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"directory": {
+														"value": "@formatDateTime(trigger().startTime,'dd-MM-yyyy')",
+														"type": "Expression"
+													},
+													"file": {
+														"value": "@item().name",
+														"type": "Expression"
+													},
+													"container": "failed",
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Delete from source 2",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Move to Failed",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "dsLoadFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													},
+													"container": "import",
+													"directory": {
+														"value": "@concat('','')",
+														"type": "Expression"
+													},
+													"file": {
+														"value": "@item().name",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true
+											}
+										}
+									},
+									{
+										"name": "Move to Archived",
+										"type": "Copy",
+										"dependsOn": [
+											{
+												"activity": "Import File",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "BinarySource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "BinaryReadSettings"
+												}
+											},
+											"sink": {
+												"type": "BinarySink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												}
+											},
+											"enableStaging": false
+										},
+										"inputs": [
+											{
+												"referenceName": "dsLoadFileBinary",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsArchiveFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Delete from source 1",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Move to Archived",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "dsLoadFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													},
+													"container": "import",
+													"directory": {
+														"value": "@concat('','')",
+														"type": "Expression"
+													},
+													"file": {
+														"value": "@item().name",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true
+											}
+										}
+									},
+									{
+										"name": "Notify Success",
+										"type": "WebActivity",
+										"dependsOn": [
+											{
+												"activity": "Delete from source 1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"url": {
+												"value": "@variables('Teams')",
+												"type": "Expression"
+											},
+											"connectVia": {
+												"referenceName": "AutoResolveIntegrationRuntime",
+												"type": "IntegrationRuntimeReference"
+											},
+											"method": "POST",
+											"headers": {
+												"Content-Type": "application/json"
+											},
+											"body": {
+												"value": "{\"@@context\":\"http://schema.org/extensions\",\"@@type\":\"MessageCard\",\"sections\":[{\"activityImage\":\"https://assets.us.ovhcloud.com/sites/default/files/medias/images/why/cert_HDS.jpg\",\"activitySubtitle\":\"\",\"activityText\":\"File loaded to stage - @{item().name} rows copied: @{activity('Import File').output.rowsCopied}\",\"activityTitle\":\"CSV File Loaded @{item().name}\"}],\"summary\":\"test\",\"themeColor\":\"#00ff00\"}",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Notify Failure",
+										"type": "WebActivity",
+										"dependsOn": [
+											{
+												"activity": "Delete from source 2",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"url": {
+												"value": "@variables('Teams')",
+												"type": "Expression"
+											},
+											"connectVia": {
+												"referenceName": "AutoResolveIntegrationRuntime",
+												"type": "IntegrationRuntimeReference"
+											},
+											"method": "POST",
+											"headers": {
+												"Content-Type": "application/json"
+											},
+											"body": {
+												"value": "{\"@@context\":\"http://schema.org/extensions\",\"@@type\":\"MessageCard\",\"sections\":[{\"activityImage\":\"https://assets.us.ovhcloud.com/sites/default/files/medias/images/why/cert_HDS.jpg\",\"activitySubtitle\":\"\",\"activityText\":\"File FAILED to load to stage - @{item().name} @{activity('Import File').Error.Message}\",\"activityTitle\":\"CSV File FAILED @{item().name} \"}],\"summary\":\"test\",\"themeColor\":\"#FF0000\"}",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Import File",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"additionalColumns": [
+													{
+														"name": "LastModifiedTimeStamp",
+														"value": {
+															"value": "@string(activity('Get File Columns').output.lastModified)",
+															"type": "Expression"
+														}
+													},
+													{
+														"name": "SourceFileName",
+														"value": {
+															"value": "@string(activity('Get File Columns').output.Itemname)",
+															"type": "Expression"
+														}
+													},
+													{
+														"name": "PipelineRunId",
+														"value": {
+															"value": "@pipeline().RunId",
+															"type": "Expression"
+														}
+													}
+												],
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "SqlDWSink",
+												"preCopyScript": {
+													"value": "delete from stage.@{activity('Get Load Table').output.firstRow.TABLE_NAME}",
+													"type": "Expression"
+												},
+												"disableMetricsCollection": false
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "dsLoadFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													},
+													"container": {
+														"value": "@pipeline().parameters.container",
+														"type": "Expression"
+													},
+													"directory": {
+														"value": "@concat('','')",
+														"type": "Expression"
+													},
+													"file": {
+														"value": "@item().name",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsDestinationTable",
+												"type": "DatasetReference",
+												"parameters": {
+													"db": {
+														"value": "@pipeline().parameters.sqlpool",
+														"type": "Expression"
+													},
+													"server": {
+														"value": "@concat('tcp:',pipeline().parameters.workspace,'.sql.azuresynapse.net,1433')",
+														"type": "Expression"
+													},
+													"table": {
+														"value": "@activity('Get Load Table').output.firstRow.TABLE_NAME",
+														"type": "Expression"
+													},
+													"schema": "stage"
+												}
+											}
+										]
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"concurrency": 1,
+		"parameters": {
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"storageuri": {
+				"type": "string",
+				"defaultValue": "https://hapdatastorageactdev.dfs.core.windows.net"
+			},
+			"container": {
+				"type": "string",
+				"defaultValue": "import"
+			},
+			"workspace": {
+				"type": "string"
+			},
+			"sqlpool": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"Teams": {
+				"type": "String",
+				"defaultValue": "https://outlook.office.com/webhook/be8e532e-aeda-4339-b58e-7045776494f3@e85feadf-11e7-47bb-a160-43b98dcc96f1/IncomingWebhook/8d2aa20c243c4008b2f7b4f8dec5b8fd/d1f03595-767f-4608-bbd7-70f1e9eea903"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"CSV AutoLoader"
+		],
+		"lastPublishTime": "2021-07-31T20:10:22Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

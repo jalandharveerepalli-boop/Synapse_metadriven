@@ -1,0 +1,637 @@
+{
+	"name": "3c_FinOpsToExternal",
+	"properties": {
+		"description": "[Process Stream Code = ADLS2EXT]",
+		"activities": [
+			{
+				"name": "LookupMetadata",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set BatchProcessLogId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetEXTERNALFeedMetadata]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Create External Table",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LookupMetadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LookupMetadata').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Build Synapse External Table",
+							"description": "",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "GetExternalTableSQL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[sp_ModifySchema]",
+								"storedProcedureParameters": {
+									"CreateSQL": {
+										"value": {
+											"value": "@activity('GetExternalTableSQL').output.firstRow.DynamicSQL",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsSynapse",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"Server": "tcp:hapsynapseworkspacedev.sql.azuresynapse.net,1433",
+									"DB": "hapsqlpooldev"
+								}
+							}
+						},
+						{
+							"name": "Log ADLS2EXT",
+							"description": "",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Create External OpenRecordset View",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetIntegrationControlProcess]",
+								"storedProcedureParameters": {
+									"IntegrationControlKey": {
+										"value": {
+											"value": "@item().IntegrationControlKey",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"OptionalDetail": {
+										"value": "nothing",
+										"type": "String"
+									},
+									"PipelineId": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ProcessStream": {
+										"value": "ADLS2EXT",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "GetExternalTableSQL",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[app].[GetCreateExternalTable]",
+									"storedProcedureParameters": {
+										"FileName": {
+											"type": "String",
+											"value": {
+												"value": "@item().ExternalTableNameADLS",
+												"type": "Expression"
+											}
+										},
+										"SQLOutput": {
+											"type": "String",
+											"value": "''"
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										}
+									}
+								}
+							}
+						},
+						{
+							"name": "Set BatchProcess Close Error9",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Build Synapse External Table",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@variables('BatchProcessLogId')",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@{activity('Build Synapse External Table').Error.Message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "3c FinOpsToExternal",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Create External OpenRecordset View",
+							"description": "",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Build Synapse External Table",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetCreateExternalView]",
+								"storedProcedureParameters": {
+									"FileName": {
+										"value": {
+											"value": "@item().ExternalTableNameADLS",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set BatchProcessLogId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogProcessStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchProcessLogId",
+					"value": {
+						"value": "@activity('LogProcessStart').output.firstrow.NewProcessId",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Create External Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": " ",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogProcessStart",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetBatchProcessLog]",
+						"storedProcedureParameters": {
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							},
+							"NewProcessId": {
+								"type": "Int32",
+								"value": "0"
+							},
+							"ProcessBatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"ProcessDataFactoryName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().DataFactory",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineRunId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								}
+							},
+							"ProcessRunMode": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.RunMode",
+									"type": "Expression"
+								}
+							},
+							"ProcessStreamCode": {
+								"type": "String",
+								"value": {
+									"value": "ADLS2EXT",
+									"type": "Expression"
+								}
+							},
+							"ProcessTriggerId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							}
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error5",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Create External Table",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('Create External Table').Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "3b Load to Parquet",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 7
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 778
+			},
+			"Container": {
+				"type": "string",
+				"defaultValue": "parquetfinance"
+			},
+			"StorageURI": {
+				"type": "string",
+				"defaultValue": "https://edpdevrtkdls002.dfs.core.windows.net"
+			},
+			"RunMode": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"FileFormat": {
+				"type": "string",
+				"defaultValue": "parquet"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "ADLS2EXT"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"finops bulk loading"
+		],
+		"lastPublishTime": "2021-07-31T19:56:49Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

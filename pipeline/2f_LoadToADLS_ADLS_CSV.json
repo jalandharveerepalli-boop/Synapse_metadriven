@@ -1,0 +1,1370 @@
+{
+	"name": "2f_LoadToADLS_ADLS_CSV",
+	"properties": {
+		"description": "[Process Stream Code = SRC2ADLS]",
+		"activities": [
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LookupTables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LookupTables').output",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "ModelJson",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "LookupColumns",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "Select replace('{\"application\": \"Dynamics\",\n  \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n  \"description\": \"@{pipeline().parameters.WorkingFileName}\",\n\"entities\": [\n    {\"$type\": \"LocalEntity\",\n      \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n      \"description\": \"@{pipeline().parameters.WorkingFileName}\",\n      \"attributes\":@{activity('LookupColumns').output.value},\n \"partitions\": [\n        {\n          \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n          \"location\": \"@{pipeline().parameters.StorageURI}@{pipeline().parameters.Container}/@{pipeline().parameters.WorkingFilePathName}/@{pipeline().parameters.WorkingFileName}/@{pipeline().parameters.WorkingFileName}.@{pipeline().parameters.FileFormat}\"\n        }\n      ]\n}\n]\n}', '\\', ' ')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsModelJson",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@pipeline().parameters.Container",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@pipeline().parameters.WorkingFilePathName",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@pipeline().parameters.StorageURI",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "LookupColumns",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "select \nss.FieldName as name\n,ss.FieldName as description\n,case  ss.FieldDataType       \n\tWHEN '[bigint]' THEN 'int64'      \n\tWHEN '[bit]' THEN 'int64'   \n\tWHEN '[datetime]' THEN 'dateTime'      \n\tWHEN '[decimal]' THEN 'double'      \n\tWHEN '[int]' THEN 'int64'      \n\tWHEN '[money]' THEN 'double'      \n\tWHEN '[numeric]' THEN 'double'      \n\tWHEN '[smallint]' THEN 'int64'      \n\tWHEN '[tinyint]' THEN 'int64'      \nelse 'string'       END as dataType    \n\nFROM app.SourceSchema ss    \n\nwhere ss.TableName = '@{item().TableName}'    \nand ss.SchemaName = '@{item().SchemaName}'\nand ss.FieldName in (@{pipeline().parameters.WorkingColumnArray})",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								},
+								"firstRowOnly": false
+							}
+						},
+						{
+							"name": "Fail Disable Feed",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "LookupColumns",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[DisableFeed]",
+								"storedProcedureParameters": {
+									"FeedKey": {
+										"value": {
+											"value": "@pipeline().parameters.ExternalFeedKey",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "LoadTypeSwitch",
+							"type": "Switch",
+							"dependsOn": [
+								{
+									"activity": "ModelJson",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@pipeline().parameters.FeedCDCType",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "5",
+										"activities": [
+											{
+												"name": "Wait5",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									},
+									{
+										"value": "1",
+										"activities": [
+											{
+												"name": "Wait1",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									},
+									{
+										"value": "2",
+										"activities": [
+											{
+												"name": "Wait2",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									},
+									{
+										"value": "4",
+										"activities": [
+											{
+												"name": "Wait4",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "Load ADLS",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "DelimitedTextSource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "DelimitedTextReadSettings"
+												}
+											},
+											"sink": {
+												"type": "ParquetSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "ParquetWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false,
+													"dateTimeFormat": "\"yyyy-MM-dd HH:mm:ss.fffffff\""
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "dsADLSfile",
+												"type": "DatasetReference",
+												"parameters": {
+													"blobfolder": {
+														"value": "@item().SchemaName",
+														"type": "Expression"
+													},
+													"blobcontainer": {
+														"value": "@item().DBName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@concat(item().TableName,'.csv')",
+														"type": "Expression"
+													},
+													"storageuri": {
+														"value": "@concat('https://',item().ServerName,'.dfs.core.windows.net')",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsParquet",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@pipeline().parameters.Container",
+														"type": "Expression"
+													},
+													"Folder": {
+														"value": "@pipeline().parameters.WorkingFilePathName",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@pipeline().parameters.WorkingFileName",
+														"type": "Expression"
+													},
+													"storageuri": {
+														"value": "@pipeline().parameters.StorageURI",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									},
+									{
+										"name": "Record Telemetry",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Log Integration Control",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[RecordTelemetry]",
+											"storedProcedureParameters": {
+												"FeedPath": {
+													"value": {
+														"value": "@pipeline().parameters.WorkingFilePathName",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"TableName": {
+													"value": {
+														"value": "[@{pipeline().parameters.BatchSchema}].[@{pipeline().parameters.WorkingFileName}]",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataFactoryName": {
+													"value": {
+														"value": "@pipeline().DataFactory",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineName": {
+													"value": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineRunId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerId": {
+													"value": {
+														"value": "@pipeline().TriggerId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerName": {
+													"value": {
+														"value": "@pipeline().TriggerName",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerTime": {
+													"value": {
+														"value": "@pipeline().TriggerTime",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerType": {
+													"value": {
+														"value": "@pipeline().TriggerType",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataRead": {
+													"value": {
+														"value": "@activity('Load ADLS').output.dataRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"DataWritten": {
+													"value": {
+														"value": "@activity('Load ADLS').output.dataWritten",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"FilesRead": {
+													"value": {
+														"value": "0",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"SourcePeakConnections": {
+													"value": {
+														"value": "@activity('Load ADLS').output.sourcePeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"SinkPeakConnections": {
+													"value": {
+														"value": "@activity('Load ADLS').output.sinkPeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"RowsRead": {
+													"value": {
+														"value": "@activity('Load ADLS').output.rowsRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"RowsCopied": {
+													"value": {
+														"value": "@activity('Load ADLS').output.rowsCopied",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"CopyDuration": {
+													"value": {
+														"value": "@activity('Load ADLS').output.copyDuration",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"Throughput": {
+													"value": {
+														"value": "@activity('Load ADLS').output.throughput",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"UsedDataIntegrationUnits": {
+													"value": {
+														"value": "@if(empty(activity('Load ADLS').output.usedDataIntegrationUnits),0,activity('Load ADLS').output.usedDataIntegrationUnits)",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"UsedParallelCopies": {
+													"value": {
+														"value": "@activity('Load ADLS').output.usedParallelCopies",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"FeedKey": {
+													"value": {
+														"value": "@pipeline().parameters.ExternalFeedKey",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"BatchRunId": {
+													"value": {
+														"value": "@pipeline().parameters.BatchRunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@activity('Log Integration Control').output.firstRow.IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"logfilepath": {
+													"value": {
+														"value": "@concat(pipeline().parameters.Container,pipeline().parameters.WorkingFilePathName,pipeline().parameters.WorkingFileName)",
+														"type": "Expression"
+													},
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference",
+											"parameters": {
+												"server": {
+													"value": "@pipeline().parameters.mdpserver",
+													"type": "Expression"
+												},
+												"dbname": {
+													"value": "@pipeline().parameters.mdpdb",
+													"type": "Expression"
+												}
+											}
+										}
+									},
+									{
+										"name": "Log Row Count",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Record Telemetry",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[SetIntegrationControlRowCount]",
+											"storedProcedureParameters": {
+												"IntegrationControlKey": {
+													"value": {
+														"value": "@activity('Log Integration Control').output.firstRow.IntegrationControlKey",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"OptionalDetail": {
+													"value": " ",
+													"type": "String"
+												},
+												"PipelineId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"ProcessStream": {
+													"value": "CSV2PQT",
+													"type": "String"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference",
+											"parameters": {
+												"server": {
+													"value": "@pipeline().parameters.mdpserver",
+													"type": "Expression"
+												},
+												"dbname": {
+													"value": "@pipeline().parameters.mdpdb",
+													"type": "Expression"
+												}
+											}
+										}
+									},
+									{
+										"name": "Log Integration Control",
+										"type": "Lookup",
+										"dependsOn": [
+											{
+												"activity": "Load ADLS",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "AzureSqlSource",
+												"sqlReaderStoredProcedureName": "[app].[SetIntegrationControlRow]",
+												"storedProcedureParameters": {
+													"BatchGroupId": {
+														"type": "Int32",
+														"value": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														}
+													},
+													"BatchRunId": {
+														"type": "Int32",
+														"value": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														}
+													},
+													"DataFactoryName": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().DataFactory",
+															"type": "Expression"
+														}
+													},
+													"ExternalFeedKey": {
+														"type": "Int32",
+														"value": {
+															"value": "@{pipeline().parameters.ExternalFeedKey}",
+															"type": "Expression"
+														}
+													},
+													"ExternalFields": {
+														"type": "String",
+														"value": {
+															"value": "@{activity('LookupColumns').output.value}",
+															"type": "Expression"
+														}
+													},
+													"ExternalFileFormat": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().parameters.FileFormat",
+															"type": "Expression"
+														}
+													},
+													"ExternalJSON": {
+														"type": "String",
+														"value": {
+															"value": "Select replace('{\"application\": \"Dynamics\",\n  \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n  \"description\": \"@{pipeline().parameters.WorkingFileName}\",\n\"entities\": [\n    {\"$type\": \"LocalEntity\",\n      \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n      \"description\": \"@{pipeline().parameters.WorkingFileName}\",\n      \"attributes\":@{activity('LookupColumns').output.value},\n \"partitions\": [\n        {\n          \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n          \"location\": \"@{pipeline().parameters.StorageURI}@{pipeline().parameters.Container}/@{pipeline().parameters.WorkingFilePathName}/@{pipeline().parameters.WorkingFileName}/@{pipeline().parameters.WorkingFileName}.@{pipeline().parameters.FileFormat}\"\n        }\n      ]\n}\n]\n}', '\\', ' ')",
+															"type": "Expression"
+														}
+													},
+													"ExternalStorageContainer": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().parameters.Container",
+															"type": "Expression"
+														}
+													},
+													"ExternalStorageFolder": {
+														"type": "String",
+														"value": {
+															"value": "@{pipeline().parameters.WorkingFilePathName}",
+															"type": "Expression"
+														}
+													},
+													"ExternalStorageURI": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														}
+													},
+													"ExternalTableName": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().parameters.ExternalFileName",
+															"type": "Expression"
+														}
+													},
+													"ExternalTableNameADLS": {
+														"type": "String",
+														"value": {
+															"value": "@{pipeline().parameters.WorkingFileName}",
+															"type": "Expression"
+														}
+													},
+													"IntegrationControlKey": {
+														"type": "Int32",
+														"value": "0"
+													},
+													"PipelineName": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().Pipeline",
+															"type": "Expression"
+														}
+													},
+													"PipelineRunId": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().RunId",
+															"type": "Expression"
+														}
+													},
+													"PipelineTriggerId": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().TriggerId",
+															"type": "Expression"
+														}
+													},
+													"PipelineTriggerName": {
+														"type": "String",
+														"value": {
+															"value": "@pipeline().TriggerName",
+															"type": "Expression"
+														}
+													}
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"dataset": {
+												"referenceName": "dsMDP",
+												"type": "DatasetReference",
+												"parameters": {
+													"server": {
+														"value": "@pipeline().parameters.mdpserver",
+														"type": "Expression"
+													},
+													"db": {
+														"value": "@pipeline().parameters.mdpdb",
+														"type": "Expression"
+													},
+													"schema": "dbo",
+													"table": "Dummy"
+												}
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Create Key Table",
+							"description": "Need to Factor in CDCType and Persist Staging Flag",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Remove File if Blank",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(pipeline().parameters.CreateKeyFile,1)",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "Load Keys to ADLS",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "AzureSqlSource",
+												"sqlReaderQuery": {
+													"value": "@pipeline().parameters.KeySelectStatement",
+													"type": "Expression"
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"sink": {
+												"type": "ParquetSink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												},
+												"formatSettings": {
+													"type": "ParquetWriteSettings"
+												}
+											},
+											"enableStaging": false,
+											"translator": {
+												"type": "TabularTranslator",
+												"typeConversion": true,
+												"typeConversionSettings": {
+													"allowDataTruncation": true,
+													"treatBooleanAsNumber": false
+												}
+											}
+										},
+										"inputs": [
+											{
+												"referenceName": "dsSQLTable",
+												"type": "DatasetReference",
+												"parameters": {
+													"DatabaseName": {
+														"value": "@pipeline().parameters.DatabaseName",
+														"type": "Expression"
+													},
+													"ServerName": {
+														"value": "@pipeline().parameters.ServerName",
+														"type": "Expression"
+													},
+													"keyvaultdnsname": {
+														"value": "@pipeline().parameters.keyvaultdnsname",
+														"type": "Expression"
+													},
+													"user": {
+														"value": "@pipeline().parameters.sourceuser",
+														"type": "Expression"
+													},
+													"secret": {
+														"value": "@pipeline().parameters.sourcesecret",
+														"type": "Expression"
+													},
+													"table": {
+														"value": "@pipeline().parameters.SourceTable",
+														"type": "Expression"
+													},
+													"schema": {
+														"value": "@pipeline().parameters.BatchSchema",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "dsParquet",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": "@pipeline().parameters.Container",
+													"Folder": {
+														"value": "@pipeline().parameters.FeedFullyQualifiedADLSKeyPath",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@pipeline().parameters.KeyFileName",
+														"type": "Expression"
+													},
+													"storageuri": "https://hapdatastorageactdev.dfs.core.windows.net"
+												}
+											}
+										]
+									},
+									{
+										"name": "Record Telemetry Deletes",
+										"type": "SqlServerStoredProcedure",
+										"dependsOn": [
+											{
+												"activity": "Load Keys to ADLS",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"storedProcedureName": "[app].[RecordTelemetry]",
+											"storedProcedureParameters": {
+												"FeedPath": {
+													"value": {
+														"value": "@pipeline().parameters.FeedFullyQualifiedADLSKeyPath",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"TableName": {
+													"value": {
+														"value": "[@{pipeline().parameters.BatchSchema}].[@{pipeline().parameters.WorkingFileName}]+'_Keys'",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataFactoryName": {
+													"value": {
+														"value": "@pipeline().DataFactory",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineName": {
+													"value": {
+														"value": "@pipeline().Pipeline",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineRunId": {
+													"value": {
+														"value": "@pipeline().RunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerId": {
+													"value": {
+														"value": "@pipeline().TriggerId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerName": {
+													"value": {
+														"value": "@pipeline().TriggerName",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerTime": {
+													"value": {
+														"value": "@pipeline().TriggerTime",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"PipelineTriggerType": {
+													"value": {
+														"value": "@pipeline().TriggerType",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"DataRead": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.dataRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"DataWritten": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.dataWritten",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"FilesRead": {
+													"value": {
+														"value": "0",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"SourcePeakConnections": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.sourcePeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"SinkPeakConnections": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.sinkPeakConnections",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"RowsRead": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.rowsRead",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"RowsCopied": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.rowsCopied",
+														"type": "Expression"
+													},
+													"type": "Int64"
+												},
+												"CopyDuration": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.copyDuration",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"Throughput": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.throughput",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"UsedDataIntegrationUnits": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.usedDataIntegrationUnits",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"UsedParallelCopies": {
+													"value": {
+														"value": "@activity('Load Keys to ADLS').output.usedParallelCopies",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												},
+												"FeedKey": {
+													"value": {
+														"value": "@pipeline().parameters.ExternalFeedKey",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"BatchRunId": {
+													"value": {
+														"value": "@pipeline().parameters.BatchRunId",
+														"type": "Expression"
+													},
+													"type": "String"
+												},
+												"IntegrationControlKey": {
+													"value": {
+														"value": "-1",
+														"type": "Expression"
+													},
+													"type": "Int32"
+												}
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "lsMDPapp",
+											"type": "LinkedServiceReference",
+											"parameters": {
+												"server": {
+													"value": "@pipeline().parameters.mdpserver",
+													"type": "Expression"
+												},
+												"dbname": {
+													"value": "@pipeline().parameters.mdpdb",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Remove File if Blank",
+							"description": "Need to Factor in CDCType and Persist Staging Flag",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "LoadTypeSwitch",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(variables('RowsToADLS'),'0')",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "Delete ADLS If Blank",
+										"type": "Delete",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "dsParquet",
+												"type": "DatasetReference",
+												"parameters": {
+													"Container": {
+														"value": "@pipeline().parameters.Container",
+														"type": "Expression"
+													},
+													"Folder": {
+														"value": "@{pipeline().parameters.WorkingFilePathName}",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@{pipeline().parameters.WorkingFileName}",
+														"type": "Expression"
+													},
+													"storageuri": {
+														"value": "@pipeline().parameters.StorageURI",
+														"type": "Expression"
+													}
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "LookupTables",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "select \nss.SchemaName\n,ss.TableName\n,DS.DatabaseName AS DBName\n,DS.DatabaseServerName AS ServerName\n\nFROM [app].[Feed] AS f WITH (NOLOCK) \n\ninner  join \n(\n\tselect distinct \n\tss.FeedKey \n\t,ss.SchemaName \n\t,ss.TableName\n\tfrom app.SourceSchema AS ss\tWITH (NOLOCK) \n) ss \non f.FeedKey = ss.FeedKey\n\nINNER JOIN [app].[DatabaseServer] AS DS\tWITH (NOLOCK) \nON F.[DatabaseServerId] = DS.[DatabaseServerId]\n\nwhere f.SourceTable = '@{pipeline().parameters.SourceTable}'    \nand f.SourceSchema = '@{pipeline().parameters.BatchSchema}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"ExternalFeedKey": {
+				"type": "string",
+				"defaultValue": "10050"
+			},
+			"FeedCDCType": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"WorkingFileName": {
+				"type": "string",
+				"defaultValue": "ce_knowledgearticle_20201127_084619.parquet"
+			},
+			"WorkingFilePathName": {
+				"type": "string",
+				"defaultValue": "raw/ce/knowledgearticle/2020-11-27/08-46-19"
+			},
+			"ExternalFileName": {
+				"type": "string",
+				"defaultValue": "ext.ce_knowledgearticle"
+			},
+			"LastRecordId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"RecordIdColumnName": {
+				"type": "string",
+				"defaultValue": "RECID"
+			},
+			"CreateTimestampColumnName": {
+				"type": "string",
+				"defaultValue": "SinkCreatedOn"
+			},
+			"DeltaReverseTimeOffsetInSecs": {
+				"type": "string",
+				"defaultValue": "60"
+			},
+			"LastSeenCreateTimestamp": {
+				"type": "string",
+				"defaultValue": "1900-01-01 00:01:01.000"
+			},
+			"EditTimestampColumnName": {
+				"type": "string",
+				"defaultValue": "LastModifiedTimeStamp"
+			},
+			"LastSeenEditTimestamp": {
+				"type": "string",
+				"defaultValue": "1900-01-01 00:01:01.000"
+			},
+			"CustomCDCQuery": {
+				"type": "string"
+			},
+			"WorkingColumnArray": {
+				"type": "string",
+				"defaultValue": "'articlepublicnumber','content','createdby','createdby_entitytype','createdbyname','createdbyyominame','createdon','createdonbehalfby','createdonbehalfby_entitytype','createdonbehalfbyname','createdonbehalfbyyominame','description','exchangerate','expirationdate','expirationstateid','expirationstatusid','expiredreviewoptions','Id','importsequencenumber','isinternal','islatestversion','isprimary','isrootarticle','keywords','knowledgearticleid','knowledgearticleviews','knowledgearticleviews_date','knowledgearticleviews_state','languagelocaleid','languagelocaleid_entitytype','languagelocaleidlocaleid','languagelocaleidname','majorversionnumber','minorversionnumber','modifiedby','modifiedby_entitytype','modifiedbyname','modifiedbyyominame','modifiedon','modifiedonbehalfby','modifiedonbehalfby_entitytype','modifiedonbehalfbyname','modifiedonbehalfbyyominame','overriddencreatedon','ownerid','ownerid_entitytype','owneridname','owneridtype','owneridyominame','owningbusinessunit','owningbusinessunit_entitytype','owningteam','owningteam_entitytype','owninguser','owninguser_entitytype','parentarticlecontentid','parentarticlecontentid_entitytype','parentarticlecontentidname','previousarticlecontentid','previousarticlecontentid_entitytype','previousarticlecontentidname','primaryauthorid','primaryauthorid_entitytype','primaryauthoridname','processid','publishon','publishstatusid','rating','rating_count','rating_date','rating_state','rating_sum','readyforreview','review','rootarticleid','rootarticleid_entitytype','rootarticleidname','scheduledstatusid','setcategoryassociations','setproductassociations','SinkCreatedOn','SinkModifiedOn','stageid','statecode','statuscode','subjectid','subjectid_entitytype','subjectiddsc','subjectidname','timezoneruleversionnumber','title','transactioncurrencyid','transactioncurrencyid_entitytype','transactioncurrencyidname','traversedpath','updatecontent','utcconversiontimezonecode','versionnumber'"
+			},
+			"Container": {
+				"type": "string",
+				"defaultValue": "d365"
+			},
+			"BatchSchema": {
+				"type": "string",
+				"defaultValue": "dbo"
+			},
+			"StorageURI": {
+				"type": "string",
+				"defaultValue": "https://edpdevrtkdls002.dfs.core.windows.net"
+			},
+			"SourceTable": {
+				"type": "string",
+				"defaultValue": "knowledgearticle"
+			},
+			"FileFormat": {
+				"type": "string",
+				"defaultValue": "parquet"
+			},
+			"BatchRunId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"DatabaseName": {
+				"type": "string",
+				"defaultValue": "ce-entitystore-dev-sqldb"
+			},
+			"ServerName": {
+				"type": "string",
+				"defaultValue": "ce-devtest-rtksql-001.database.windows.net"
+			},
+			"BatchGroupId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"CreateKeyFile": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"FeedFullyQualifiedADLSKeyPath": {
+				"type": "string"
+			},
+			"KeyFileName": {
+				"type": "string"
+			},
+			"KeySelectStatement": {
+				"type": "string"
+			},
+			"BatchProcessLogId": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"sourceuser": {
+				"type": "string"
+			},
+			"sourcesecret": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"RowsToADLS": {
+				"type": "String",
+				"defaultValue": "999"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"standard load eg CE"
+		],
+		"lastPublishTime": "2021-07-31T20:02:27Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

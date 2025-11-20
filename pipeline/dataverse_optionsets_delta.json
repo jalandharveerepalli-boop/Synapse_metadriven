@@ -1,0 +1,639 @@
+{
+	"name": "dataverse_optionsets_delta",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get TenantId from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/dataversetenantid?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "LookupOptionSets",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "LookupAuth",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetOptionSetGroup]",
+						"storedProcedureParameters": {
+							"OptionSetGroupID": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.OptionSetGroupID",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@concat(activity('Get mdpserver from Azure Key Vault').output.value,'.database.windows.net')",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@activity('Get mdpdb from Azure Key Vault').output.value",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Get mdpdb from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/mdpdb?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get mdpserver from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/mdpserver?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get sqlpool from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/sqlpool?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get workspace from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/workspace?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "LookupOptionSets",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set Bearer",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LookupOptionSets').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "CopyDataverseEntity",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:15:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "JsonSource",
+									"storeSettings": {
+										"type": "HttpReadSettings",
+										"requestMethod": "GET",
+										"additionalHeaders": {
+											"value": "@{concat('Authorization: Bearer ',variables('Bearer'))}",
+											"type": "Expression"
+										},
+										"requestTimeout": ""
+									},
+									"formatSettings": {
+										"type": "JsonReadSettings"
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings",
+										"filePattern": "arrayOfObjects"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "dsHTTP_JSON",
+									"type": "DatasetReference",
+									"parameters": {
+										"basurl": {
+											"value": "@item().OptionSetURL",
+											"type": "Expression"
+										},
+										"relativeurl": {
+											"value": "@concat('','')",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsADLSJson",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().Container",
+											"type": "Expression"
+										},
+										"FolderPath": {
+											"value": "@item().FeedFullyQualifiedADLSRawPath",
+											"type": "Expression"
+										},
+										"File": {
+											"value": "@item().RawFilename",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "json_proc",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "CopyDataverseEntity",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": {
+									"value": "@item().json_proc",
+									"type": "Expression"
+								},
+								"storedProcedureParameters": {
+									"tablename": {
+										"value": {
+											"value": "@item().SourceTable",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"path": {
+										"value": {
+											"value": "@item().FeedFullyQualifiedADLSRawPath",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"schema": {
+										"value": {
+											"value": "@item().Domain",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsSynapse",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"Server": {
+										"value": "@concat('tcp:',activity('Get workspace from Azure Key Vault').output.value)",
+										"type": "Expression"
+									},
+									"DB": {
+										"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "json_proc",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Secret from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "LookupAuth",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/',activity('LookupAuth').output.firstRow.KeyVaultSecret,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Auth",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get Secret from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@replace(concat('https://login.microsoftonline.com/',activity('Get TenantId from Azure Key Vault').output.value ,'/oauth2/v2.0/token'),' ','')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					"body": {
+						"value": "@concat('client_id=',activity('LookupAuth').output.firstRow.UserName\n,'&client_secret=',activity('Get Secret from Azure Key Vault').output.value\n,'&scope=',activity('LookupAuth').output.firstRow.DatabaseServerName ,'.default'\n,'&grant_type=client_credentials')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "LookupAuth",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Get TenantId from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get mdpdb from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get mdpserver from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get sqlpool from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get workspace from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get storageuri from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetOptionSetGroup]",
+						"storedProcedureParameters": {
+							"OptionSetGroupID": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.OptionSetGroupID",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@concat(activity('Get mdpserver from Azure Key Vault').output.value,'.database.windows.net')",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@activity('Get mdpdb from Azure Key Vault').output.value",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "Get storageuri from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/storageuri?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Set Bearer",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Auth",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Bearer",
+					"value": {
+						"value": "@activity('Auth').output.access_token",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"KeyVault": {
+				"type": "string",
+				"defaultValue": "SNDFFCINFKV4401"
+			},
+			"OptionSetGroupID": {
+				"type": "int",
+				"defaultValue": 1
+			}
+		},
+		"variables": {
+			"relativeurl": {
+				"type": "String"
+			},
+			"Bearer": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "dataverse"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-11-21T20:26:32Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

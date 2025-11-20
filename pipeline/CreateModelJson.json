@@ -1,0 +1,178 @@
+{
+	"name": "CreateModelJson",
+	"properties": {
+		"activities": [
+			{
+				"name": "ModelJson",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select replace('{\"application\": \"Dynamics\",\n  \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n  \"description\": \"@{pipeline().parameters.WorkingFileName}\",\n\"entities\": [\n    {\"$type\": \"LocalEntity\",\n      \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n      \"description\": \"@{pipeline().parameters.WorkingFileName}\",\n      \"attributes\":@{pipeline().parameters.ModelJsonQuery},\n \"partitions\": [\n        {\n          \"name\": \"@{pipeline().parameters.WorkingFileName}\",\n          \"location\": \"@{pipeline().parameters.StorageURI}@{pipeline().parameters.Container}/@{pipeline().parameters.WorkingFilePathName}/@{pipeline().parameters.WorkingFileName}\"\n        }\n      ]\n}\n]\n}', '\\', ' ')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "dsCDCMetadata",
+						"type": "DatasetReference",
+						"parameters": {
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "dsModelJson_Azure",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.Container",
+								"type": "Expression"
+							},
+							"Folder": {
+								"value": "@pipeline().parameters.WorkingFilePathName",
+								"type": "Expression"
+							},
+							"storageuri": {
+								"value": "@pipeline().parameters.StorageURI",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Set BatchProcess Close Error Type ModelJson",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "ModelJson",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchProcessLogId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('ModelJson').Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "2sub CopyData ModelJson",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp_Azure",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "lbs-sqldb-mdp-test"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "lbs-sql-mdp-test.database.windows.net"
+			},
+			"Container": {
+				"type": "string",
+				"defaultValue": "testersh"
+			},
+			"WorkingFilePathName": {
+				"type": "string",
+				"defaultValue": "testersh"
+			},
+			"StorageURI": {
+				"type": "string",
+				"defaultValue": "https://lbsstdatalake002.dfs.core.windows.net "
+			},
+			"ModelJsonQuery": {
+				"type": "string",
+				"defaultValue": "select 1 as column1"
+			},
+			"BatchProcessLogId": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"WorkingFileName": {
+				"type": "string",
+				"defaultValue": "testersh.parquet"
+			}
+		},
+		"folder": {
+			"name": "MDPUtil"
+		},
+		"annotations": []
+	}
+}

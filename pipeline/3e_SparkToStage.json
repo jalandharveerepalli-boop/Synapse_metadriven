@@ -1,0 +1,460 @@
+{
+	"name": "3e_SparkToStage",
+	"properties": {
+		"description": "in development",
+		"activities": [
+			{
+				"name": "Get File List",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "LocalFileList",
+						"type": "DatasetReference",
+						"parameters": {
+							"Directory": {
+								"value": "@pipeline().parameters.Directory",
+								"type": "Expression"
+							},
+							"storageuri": {
+								"value": "@pipeline().parameters.storageuri",
+								"type": "Expression"
+							},
+							"container": "synapse",
+							"file": {
+								"value": "@concat('','')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "Upload Files",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get File List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set Landing Path",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get File List').output.childItems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Case Copy",
+							"type": "Switch",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@substring(item().name,add(indexof(item().name,'.'),1),sub(length(item().name),add(indexof(item().name,'.'),1)))",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "xlsx",
+										"activities": [
+											{
+												"name": "XLS Copy",
+												"type": "Copy",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "ExcelSource",
+														"storeSettings": {
+															"type": "AzureBlobFSReadSettings",
+															"recursive": true
+														}
+													},
+													"sink": {
+														"type": "DelimitedTextSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "DelimitedTextWriteSettings",
+															"quoteAllText": true,
+															"fileExtension": ".txt"
+														}
+													},
+													"enableStaging": false,
+													"translator": {
+														"type": "TabularTranslator",
+														"typeConversion": true,
+														"typeConversionSettings": {
+															"allowDataTruncation": true,
+															"treatBooleanAsNumber": false
+														}
+													}
+												},
+												"inputs": [
+													{
+														"referenceName": "LocalFileExcel",
+														"type": "DatasetReference",
+														"parameters": {
+															"FileName": {
+																"value": "@item().name",
+																"type": "Expression"
+															},
+															"Directory": {
+																"value": "@pipeline().parameters.Directory",
+																"type": "Expression"
+															},
+															"container": "synapse",
+															"storageuri": {
+																"value": "@pipeline().parameters.storageuri",
+																"type": "Expression"
+															}
+														}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "LakeFileCSV",
+														"type": "DatasetReference",
+														"parameters": {
+															"FileName": {
+																"value": "@replace(item().name,'xlsx','csv')",
+																"type": "Expression"
+															},
+															"Directory": {
+																"value": "@concat('Landing/',variables('ProcessDateFolder'))",
+																"type": "Expression"
+															},
+															"container": "synapse",
+															"storageuri": {
+																"value": "@pipeline().parameters.storageuri",
+																"type": "Expression"
+															}
+														}
+													}
+												]
+											}
+										]
+									},
+									{
+										"value": "txt",
+										"activities": [
+											{
+												"name": "TXT Copy",
+												"type": "Copy",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "DelimitedTextSource",
+														"storeSettings": {
+															"type": "AzureBlobFSReadSettings",
+															"recursive": true
+														},
+														"formatSettings": {
+															"type": "DelimitedTextReadSettings"
+														}
+													},
+													"sink": {
+														"type": "DelimitedTextSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "DelimitedTextWriteSettings",
+															"quoteAllText": true,
+															"fileExtension": ".txt"
+														}
+													},
+													"enableStaging": false
+												},
+												"inputs": [
+													{
+														"referenceName": "LakeFileTxt",
+														"type": "DatasetReference",
+														"parameters": {
+															"FileName": "@item().name",
+															"Directory": "@pipeline().parameters.Directory",
+															"storageuri": {
+																"value": "@pipeline().parameters.storageuri",
+																"type": "Expression"
+															},
+															"container": "synapse"
+														}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "LakeFileCSV",
+														"type": "DatasetReference",
+														"parameters": {
+															"FileName": {
+																"value": "@replace(item().name,'txt','csv')",
+																"type": "Expression"
+															},
+															"Directory": {
+																"value": "@concat('Landing/',variables('ProcessDateFolder'))",
+																"type": "Expression"
+															},
+															"container": "synapse",
+															"storageuri": {
+																"value": "@pipeline().parameters.storageuri",
+																"type": "Expression"
+															}
+														}
+													}
+												]
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "Binary Copy",
+										"type": "Copy",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "BinarySource",
+												"storeSettings": {
+													"type": "AzureBlobFSReadSettings",
+													"recursive": true
+												},
+												"formatSettings": {
+													"type": "BinaryReadSettings"
+												}
+											},
+											"sink": {
+												"type": "BinarySink",
+												"storeSettings": {
+													"type": "AzureBlobFSWriteSettings"
+												}
+											},
+											"enableStaging": false
+										},
+										"inputs": [
+											{
+												"referenceName": "LocalFileBinary",
+												"type": "DatasetReference",
+												"parameters": {
+													"Directory": {
+														"value": "@pipeline().parameters.Directory",
+														"type": "Expression"
+													},
+													"FileName": {
+														"value": "@item().name",
+														"type": "Expression"
+													},
+													"container": "synapse",
+													"storageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													}
+												}
+											}
+										],
+										"outputs": [
+											{
+												"referenceName": "LakeFileBinary",
+												"type": "DatasetReference",
+												"parameters": {
+													"Directory": {
+														"value": "@concat('landing/',variables('ProcessDateFolder'))",
+														"type": "Expression"
+													},
+													"stroageuri": {
+														"value": "@pipeline().parameters.storageuri",
+														"type": "Expression"
+													},
+													"container": "synapse",
+													"file": {
+														"value": "@concat('','')",
+														"type": "Expression"
+													}
+												}
+											}
+										]
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set Landing Path",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ProcessDateFolder",
+					"value": {
+						"value": "@concat('Year=',formatDateTime(utcnow(),'yyyy'),'/','Month=',formatDateTime(utcnow(),'MM'),'/','Day=',formatDateTime(utcnow(),'dd'),'/','Hour=',formatDateTime(utcnow(),'hh'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Create Synapse Tables",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Upload Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get CSV File List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get CSV File List').output.childItems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Create Spark Table",
+							"description": "base paramaters\n\ninputFilePathFull\n@concat('/landing/',variables('ProcessDateFolder'),'/',item().name)\n\n",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get CSV File List",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Upload Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "LakeFileCSVList",
+						"type": "DatasetReference",
+						"parameters": {
+							"Directory": {
+								"value": "@concat('landing/',variables('ProcessDateFolder'))",
+								"type": "Expression"
+							},
+							"container": "synapse",
+							"file": {
+								"value": "@concat('','')",
+								"type": "Expression"
+							},
+							"storageuri": {
+								"value": "@pipeline().parameters.storageuri",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Directory": {
+				"type": "string",
+				"defaultValue": "input"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"storageuri": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessDateFolder": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "MDPspark"
+		},
+		"annotations": [],
+		"lastPublishTime": "2020-11-11T16:51:39Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

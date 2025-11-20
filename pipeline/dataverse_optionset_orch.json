@@ -1,0 +1,93 @@
+{
+	"name": "dataverse_optionset_orch",
+	"properties": {
+		"activities": [
+			{
+				"name": "OptionsetGroup1",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "dataverse_optionsets_delta",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"KeyVault": {
+							"value": "@pipeline().parameters.KeyVault",
+							"type": "Expression"
+						},
+						"OptionSetGroupID": 1
+					}
+				}
+			},
+			{
+				"name": "OptionsetGroup2",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "OptionsetGroup1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "dataverse_optionsets_delta",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"KeyVault": {
+							"value": "@pipeline().parameters.KeyVault",
+							"type": "Expression"
+						},
+						"OptionSetGroupID": 1
+					}
+				}
+			},
+			{
+				"name": "OptionsetGroup3",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "OptionsetGroup2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "dataverse_optionsets_delta",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"KeyVault": {
+							"value": "@pipeline().parameters.KeyVault",
+							"type": "Expression"
+						},
+						"OptionSetGroupID": 1
+					}
+				}
+			}
+		],
+		"parameters": {
+			"KeyVault": {
+				"type": "string",
+				"defaultValue": "SNDFFCINFKV4401"
+			}
+		},
+		"folder": {
+			"name": "dataverse"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-11-21T20:25:54Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

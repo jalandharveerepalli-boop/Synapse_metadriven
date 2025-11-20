@@ -1,0 +1,575 @@
+{
+	"name": "2_SourceToADLS",
+	"properties": {
+		"description": "source to storage (parquet)\n\n[Process Stream Code = SRC2ADLS]",
+		"activities": [
+			{
+				"name": "RunModeTypeSwitch",
+				"description": "No start end process as difference Process Stream Name Required",
+				"type": "Switch",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.RunMode",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "1",
+							"activities": [
+								{
+									"name": "finops no adls egress",
+									"type": "Wait",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"waitTimeInSeconds": 1
+									}
+								}
+							]
+						},
+						{
+							"value": "2",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_2",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "0",
+							"activities": [
+								{
+									"name": "Wait1 finops",
+									"type": "Wait",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"waitTimeInSeconds": 1
+									}
+								}
+							]
+						},
+						{
+							"value": "3",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_3",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "4",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_4",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "5",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_5",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "6",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_6",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "10",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_10",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "11",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_11",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "7",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_7",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "12",
+							"activities": [
+								{
+									"name": "2_1_SourceToADLS_Classic_12",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "2_1_SourceToADLS_Classic",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.StorageURI",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"StorageURI": {
+				"type": "string",
+				"defaultValue": "https://edpdevrtkdls002.dfs.core.windows.net"
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"RunMode": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"globalparameterStorageAccountCDM": {
+				"type": "string",
+				"defaultValue": "stmdpdls001.dfs.core.windows.net"
+			},
+			"globalparameterContainerCDM": {
+				"type": "string",
+				"defaultValue": "serverless-cdm"
+			},
+			"globalparameterFolderCDM": {
+				"type": "string",
+				"defaultValue": "DEV"
+			},
+			"globalparameterStorageSchemaCDM": {
+				"type": "string",
+				"defaultValue": "tables"
+			},
+			"globalparameterStoragePartitionSizeMB": {
+				"type": "string",
+				"defaultValue": "200"
+			},
+			"globalparameterStorageTenantID": {
+				"type": "string",
+				"defaultValue": "e85feadf-11e7-47bb-a160-43b98dcc96f1"
+			},
+			"globalparameterSQLEndPoint": {
+				"type": "string",
+				"defaultValue": "Server=mdp-synws-dev-ondemand.sql.azuresynapse.net;Database=AdHocAnalysis;Uid= sqladminuser;Pwd=Ra3&78ndom^83Ju83%nk"
+			},
+			"globalparameterDataSourceNameCDM": {
+				"type": "string",
+				"defaultValue": "datasourceCDMwwi"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "hapmdpappdbdev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "hapsqlserverdev.database.windows.net"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"BatchTables": {
+				"type": "String",
+				"defaultValue": "CustomerTransactions,IncrementalOrders"
+			},
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "SRC2ADLS"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPCore"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T20:12:57Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

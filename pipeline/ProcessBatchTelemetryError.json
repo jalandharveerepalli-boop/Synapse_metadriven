@@ -1,0 +1,146 @@
+{
+	"name": "ProcessBatchTelemetryError",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set BatchTelemetry Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchTelemetryClose]",
+					"storedProcedureParameters": {
+						"BatchRunId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@pipeline().parameters.ErrorMessage",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": {
+								"value": "@pipeline().parameters.SuccessFlag",
+								"type": "Expression"
+							},
+							"type": "Int16"
+						},
+						"ProcessStreamCode": {
+							"value": {
+								"value": "@pipeline().parameters.ProcessStreamCode",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Pause if Outside Business Hours",
+				"description": "set outside business hours in this expression    h01  h02   h03    ",
+				"type": "IfCondition",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@contains('h01h02h03h04h05h06h07h18h19h20h21h22h23h24',concat('h',substring(formatDateTime(utcnow()),11,2)))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Pause Synapse",
+							"description": "Pause Synapse Webhook",
+							"type": "WebHook",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@pipeline().parameters.suspendwebhook",
+									"type": "Expression"
+								},
+								"method": "POST",
+								"headers": {
+									"Content-Type": "application/json"
+								},
+								"body": {
+									"value": "@json(pipeline().parameters.body)",
+									"type": "Expression"
+								},
+								"timeout": "00:10:00",
+								"reportStatusOnCallBack": false
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"mdpserver": {
+				"type": "string"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"BatchRunId": {
+				"type": "string"
+			},
+			"ErrorMessage": {
+				"type": "string"
+			},
+			"SuccessFlag": {
+				"type": "string"
+			},
+			"ProcessStreamCode": {
+				"type": "string"
+			},
+			"suspendwebhook": {
+				"type": "string"
+			},
+			"body": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "MDPError"
+		},
+		"annotations": []
+	}
+}

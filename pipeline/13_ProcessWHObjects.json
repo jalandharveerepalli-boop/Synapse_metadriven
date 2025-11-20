@@ -1,0 +1,599 @@
+{
+	"name": "13_ProcessWHObjects",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetDimTables",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Get OnDemandDatabase from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get OnDemandServer from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get storageuri from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlDWSource",
+						"sqlReaderQuery": "select \n'warehouse' as target_schema \n,o.name as target_object\n\n,'mart' as source_schema \n,o.name as source_object \n\n,'warehouse/'+ o.name storage_object_name \n\nfrom sys.all_objects as o\n\nLEFT OUTER JOIN sys.all_columns c\nON o.object_id = c.object_id\n\nwhere o.type = 'V'\nand o.schema_id = schema_id('mart')\nand o.name like 'dim_%' \n--and 1<>1\n\ngroup by \no.name",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsOnDemand",
+						"type": "DatasetReference",
+						"parameters": {
+							"OnDemandServer": {
+								"value": "@concat(activity('Get OnDemandServer from Azure Key Vault').output,'-ondemand.sql.azuresynapse.net')",
+								"type": "Expression"
+							},
+							"OnDemandDatabase": {
+								"value": "@activity('Get OnDemandDatabase from Azure Key Vault').output",
+								"type": "Expression"
+							},
+							"Schema": "sys",
+							"Object": "all_objects"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Get OnDemandDatabase from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/ondemanddatabase?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get OnDemandServer from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/workspace?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "IterateDims",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetDimTables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetDimTables').output.value",
+						"type": "Expression"
+					},
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "SourceDeltaDims",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Delete1",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlDWSource",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings",
+										"blockSizeInMB": 100
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsOnDemand",
+									"type": "DatasetReference",
+									"parameters": {
+										"OnDemandServer": "mvpssotmdpsw1001-ondemand.sql.azuresynapse.net",
+										"OnDemandDatabase": "MDPOndemand",
+										"Schema": {
+											"value": "@item().source_schema",
+											"type": "Expression"
+										},
+										"Object": {
+											"value": "@item().source_object",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().target_object,'.parquet')",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete1",
+							"type": "Delete",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "dsParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().target_object,'.parquet')",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "Create Warehouse Views Dims",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SourceDeltaDims",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "app.create_warehouse_views",
+								"storedProcedureParameters": {
+									"object_name": {
+										"value": {
+											"value": "@item().source_object",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsSynaseOnDemand",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"OnDemandServer": "mvpssotmdpsw1001-ondemand.sql.azuresynapse.net",
+									"OnDemandDatabase": "MDPOndemand"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get storageuri from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/storageuri?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "GetFactTables",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "IterateDims",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlDWSource",
+						"sqlReaderQuery": "select \n'warehouse' as target_schema \n,o.name as target_object\n\n,'mart' as source_schema \n,o.name as source_object \n\n,'warehouse/'+ o.name storage_object_name \n\nfrom sys.all_objects as o\n\nLEFT OUTER JOIN sys.all_columns c\nON o.object_id = c.object_id\n\nwhere o.type = 'V'\nand o.schema_id = schema_id('mart')\nand o.name like 'fact_%' \n--and 1<>1\n\ngroup by \no.name",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsOnDemand",
+						"type": "DatasetReference",
+						"parameters": {
+							"OnDemandServer": {
+								"value": "@concat(activity('Get OnDemandServer from Azure Key Vault').output,'-ondemand.sql.azuresynapse.net')",
+								"type": "Expression"
+							},
+							"OnDemandDatabase": {
+								"value": "@activity('Get OnDemandDatabase from Azure Key Vault').output",
+								"type": "Expression"
+							},
+							"Schema": "sys",
+							"Object": "all_objects"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "IterateFacts",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetFactTables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetFactTables').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"batchCount": 10,
+					"activities": [
+						{
+							"name": "SourceDeltaFacts",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "DeleteFacts",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlDWSource",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings",
+										"blockSizeInMB": 100
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsOnDemand",
+									"type": "DatasetReference",
+									"parameters": {
+										"OnDemandServer": "mvpssotmdpsw1001-ondemand.sql.azuresynapse.net",
+										"OnDemandDatabase": "MDPOndemand",
+										"Schema": {
+											"value": "@item().source_schema",
+											"type": "Expression"
+										},
+										"Object": {
+											"value": "@item().source_object",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().target_object,'.parquet')",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "DeleteFacts",
+							"type": "Delete",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "dsParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@item().target_schema",
+											"type": "Expression"
+										},
+										"Folder": {
+											"value": "@item().target_object",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().target_object,'.parquet')",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "Create Warehouse Views Facts",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "SourceDeltaFacts",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "app.create_warehouse_views",
+								"storedProcedureParameters": {
+									"object_name": {
+										"value": {
+											"value": "@item().source_object",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsSynaseOnDemand",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"OnDemandServer": "mvpssotmdpsw1001-ondemand.sql.azuresynapse.net",
+									"OnDemandDatabase": "MDPOndemand"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"Keyvault": {
+				"type": "string",
+				"defaultValue": "devslpmdpkv1001"
+			}
+		},
+		"folder": {
+			"name": "MDPOnDemand"
+		},
+		"annotations": []
+	}
+}

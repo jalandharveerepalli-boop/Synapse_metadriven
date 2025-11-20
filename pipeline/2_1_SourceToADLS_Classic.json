@@ -1,0 +1,2042 @@
+{
+	"name": "2_1_SourceToADLS_Classic",
+	"properties": {
+		"description": "source to storage (parquet)\n\n[Process Stream Code = SRC2ADLS]",
+		"activities": [
+			{
+				"name": "ForEachTable",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Set Tables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@split(variables('BatchTables'), ',')",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Set BatchProcess Close Error2",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Determine Source Pipeline",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@variables('BatchProcessLogId')",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@{activity('Determine Source Pipeline').Error.Message}",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "2c or 2d Child ADLS Pipeline",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Determine Source Pipeline",
+							"description": "Default = SQL On-Prem\n1 = FinOps to ADLS (not required)\n2 = Oracle\n3 = Azure SQL\n4 = SQL Server\n5 = CSV \n6 = MS Access\n7 = Sharepoint \n8 = Power BI Admin Api\n9 = Azure Cost Api\n10 = MySQL - AzureMySQL\n11 = PostgreSQL - AzurePostgreSQL",
+							"type": "Switch",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@pipeline().parameters.RunMode",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "2",
+										"activities": [
+											{
+												"name": "2d_LoadToADLS_oracle",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "LookupMetadata_2d",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2d_LoadToADLS_Oracle",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@activity('LookupMetadata_2d').output.firstrow.FeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@activity('LookupMetadata_2d').output.firstrow.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.RawFilename",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.FeedFullyQualifiedADLSRawPath",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.ExternalFilename",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.SourceColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@variables('BatchProcessLogId')",
+															"type": "Expression"
+														},
+														"KeyVaultSecret": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.KeyVaultSecret",
+															"type": "Expression"
+														},
+														"Port": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.FriendlyServerName",
+															"type": "Expression"
+														},
+														"User": {
+															"value": "@activity('LookupMetadata_2d').output.firstRow.UserName",
+															"type": "Expression"
+														},
+														"IsSHIR": {
+															"value": "1",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "LookupMetadata_2d",
+												"description": "exec [app].[SetADLSFeedMetadata]",
+												"type": "Lookup",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "AzureSqlSource",
+														"sqlReaderStoredProcedureName": "[app].[SetADLSFeedMetadata]",
+														"storedProcedureParameters": {
+															"BatchGroupId": {
+																"type": "Int32",
+																"value": {
+																	"value": "@pipeline().parameters.BatchGroupId",
+																	"type": "Expression"
+																}
+															},
+															"TableName": {
+																"type": "String",
+																"value": {
+																	"value": "@item()",
+																	"type": "Expression"
+																}
+															}
+														},
+														"queryTimeout": "02:00:00",
+														"partitionOption": "None"
+													},
+													"dataset": {
+														"referenceName": "dsMDP",
+														"type": "DatasetReference",
+														"parameters": {
+															"server": {
+																"value": "@pipeline().parameters.mdpserver",
+																"type": "Expression"
+															},
+															"db": {
+																"value": "@pipeline().parameters.mdpdb",
+																"type": "Expression"
+															},
+															"schema": "dbo",
+															"table": "Dummy"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "3",
+										"activities": [
+											{
+												"name": "2e_LoadToADLS_AzureSQL",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "LookupMetadata_2e",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2e_LoadToADLS_AzureSQL",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@activity('LookupMetadata_2e').output.firstrow.FeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@activity('LookupMetadata_2e').output.firstrow.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.RawFilename",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.FeedFullyQualifiedADLSRawPath",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.ExternalFilename",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.SourceColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@variables('BatchProcessLogId')",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"sourceuser": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.UserName",
+															"type": "Expression"
+														},
+														"sourcesecret": {
+															"value": "@activity('LookupMetadata_2e').output.firstRow.KeyVaultSecret",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "LookupMetadata_2e",
+												"description": "exec [app].[SetADLSFeedMetadata]",
+												"type": "Lookup",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "AzureSqlSource",
+														"sqlReaderStoredProcedureName": "[app].[SetADLSFeedMetadata]",
+														"storedProcedureParameters": {
+															"BatchGroupId": {
+																"type": "Int32",
+																"value": {
+																	"value": "@pipeline().parameters.BatchGroupId",
+																	"type": "Expression"
+																}
+															},
+															"TableName": {
+																"type": "String",
+																"value": {
+																	"value": "@item()",
+																	"type": "Expression"
+																}
+															}
+														},
+														"queryTimeout": "02:00:00",
+														"partitionOption": "None"
+													},
+													"dataset": {
+														"referenceName": "dsMDP",
+														"type": "DatasetReference",
+														"parameters": {
+															"server": {
+																"value": "@pipeline().parameters.mdpserver",
+																"type": "Expression"
+															},
+															"db": {
+																"value": "@pipeline().parameters.mdpdb",
+																"type": "Expression"
+															},
+															"schema": "dbo",
+															"table": "Dummy"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "5",
+										"activities": [
+											{
+												"name": "2f_LoadToADLS_CSV",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "LookupMetadata_2f",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2f_LoadToADLS_CSV",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@activity('LookupMetadata_2f').output.firstrow.FeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@activity('LookupMetadata_2f').output.firstrow.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.RawFilename",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.FeedFullyQualifiedADLSRawPath",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.ExternalFilename",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.SourceColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@variables('BatchProcessLogId')",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"user": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.UserName",
+															"type": "Expression"
+														},
+														"secret": {
+															"value": "@activity('LookupMetadata_2f').output.firstRow.KeyVaultSecret",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "LookupMetadata_2f",
+												"description": "exec [app].[SetADLSFeedMetadata]",
+												"type": "Lookup",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "AzureSqlSource",
+														"sqlReaderStoredProcedureName": "[app].[SetADLSFeedMetadata]",
+														"storedProcedureParameters": {
+															"BatchGroupId": {
+																"type": "Int32",
+																"value": {
+																	"value": "@pipeline().parameters.BatchGroupId",
+																	"type": "Expression"
+																}
+															},
+															"TableName": {
+																"type": "String",
+																"value": {
+																	"value": "@item()",
+																	"type": "Expression"
+																}
+															}
+														},
+														"queryTimeout": "02:00:00",
+														"partitionOption": "None"
+													},
+													"dataset": {
+														"referenceName": "dsMDP",
+														"type": "DatasetReference",
+														"parameters": {
+															"server": {
+																"value": "@pipeline().parameters.mdpserver",
+																"type": "Expression"
+															},
+															"db": {
+																"value": "@pipeline().parameters.mdpdb",
+																"type": "Expression"
+															},
+															"schema": "dbo",
+															"table": "Dummy"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "6",
+										"activities": [
+											{
+												"name": "2g_LoadToADLS_MSAccess",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "LookupMetadata_2g",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2g_LoadToADLS_MSAccess",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@activity('LookupMetadata_2g').output.firstrow.FeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@activity('LookupMetadata_2g').output.firstrow.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.RawFilename",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.FeedFullyQualifiedADLSRawPath",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.ExternalFilename",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.SourceColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@variables('BatchProcessLogId')",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"user": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.UserName",
+															"type": "Expression"
+														},
+														"secret": {
+															"value": "@activity('LookupMetadata_2g').output.firstRow.KeyVaultSecret",
+															"type": "Expression"
+														},
+														"FilePwdSecret": {
+															"value": "@activity('LookupMetadata_2g').output.firstrow.Collation",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "LookupMetadata_2g",
+												"description": "exec [app].[SetADLSFeedMetadata]",
+												"type": "Lookup",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "AzureSqlSource",
+														"sqlReaderStoredProcedureName": "[app].[SetADLSFeedMetadata]",
+														"storedProcedureParameters": {
+															"BatchGroupId": {
+																"type": "Int32",
+																"value": {
+																	"value": "@pipeline().parameters.BatchGroupId",
+																	"type": "Expression"
+																}
+															},
+															"TableName": {
+																"type": "String",
+																"value": {
+																	"value": "@item()",
+																	"type": "Expression"
+																}
+															}
+														},
+														"queryTimeout": "02:00:00",
+														"partitionOption": "None"
+													},
+													"dataset": {
+														"referenceName": "dsMDP",
+														"type": "DatasetReference",
+														"parameters": {
+															"server": {
+																"value": "@pipeline().parameters.mdpserver",
+																"type": "Expression"
+															},
+															"db": {
+																"value": "@pipeline().parameters.mdpdb",
+																"type": "Expression"
+															},
+															"schema": "dbo",
+															"table": "Dummy"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "7",
+										"activities": [
+											{
+												"name": "Wait1",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									},
+									{
+										"value": "10",
+										"activities": [
+											{
+												"name": "Wait4",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									},
+									{
+										"value": "11",
+										"activities": [
+											{
+												"name": "Wait3",
+												"type": "Wait",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"waitTimeInSeconds": 1
+												}
+											}
+										]
+									},
+									{
+										"value": "12",
+										"activities": [
+											{
+												"name": "2m_LoadToADLS_AmazonS3",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "LookupMetadata_2m",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2m_LoadToADLS_AmazonS3",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@activity('LookupMetadata_2m').output.firstrow.FeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@activity('LookupMetadata_2m').output.firstrow.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.RawFilename",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.FeedFullyQualifiedADLSRawPath",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.ExternalFilename",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.SourceColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@variables('BatchProcessLogId')",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"sourceuser": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.UserName",
+															"type": "Expression"
+														},
+														"sourcesecret": {
+															"value": "@activity('LookupMetadata_2m').output.firstRow.KeyVaultSecret",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "LookupMetadata_2m",
+												"description": "exec [app].[SetADLSFeedMetadata]",
+												"type": "Lookup",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "AzureSqlSource",
+														"sqlReaderStoredProcedureName": "[app].[SetADLSFeedMetadata]",
+														"storedProcedureParameters": {
+															"BatchGroupId": {
+																"type": "Int32",
+																"value": {
+																	"value": "@pipeline().parameters.BatchGroupId",
+																	"type": "Expression"
+																}
+															},
+															"TableName": {
+																"type": "String",
+																"value": {
+																	"value": "@item()",
+																	"type": "Expression"
+																}
+															}
+														},
+														"queryTimeout": "02:00:00",
+														"partitionOption": "None"
+													},
+													"dataset": {
+														"referenceName": "dsMDP",
+														"type": "DatasetReference",
+														"parameters": {
+															"server": {
+																"value": "@pipeline().parameters.mdpserver",
+																"type": "Expression"
+															},
+															"db": {
+																"value": "@pipeline().parameters.mdpdb",
+																"type": "Expression"
+															},
+															"schema": "dbo",
+															"table": "Dummy"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "4",
+										"activities": [
+											{
+												"name": "2c_LoadToADLS_SQL",
+												"type": "ExecutePipeline",
+												"dependsOn": [
+													{
+														"activity": "LookupMetadata_2c",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2c_LoadToADLS_SQL",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@activity('LookupMetadata_2c').output.firstrow.FeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@activity('LookupMetadata_2c').output.firstrow.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.RawFilename",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.FeedFullyQualifiedADLSRawPath",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.ExternalFilename",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.SourceColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@variables('BatchProcessLogId')",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"user": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.UserName",
+															"type": "Expression"
+														},
+														"secret": {
+															"value": "@activity('LookupMetadata_2c').output.firstRow.KeyVaultSecret",
+															"type": "Expression"
+														}
+													}
+												}
+											},
+											{
+												"name": "LookupMetadata_2c",
+												"description": "exec [app].[SetADLSFeedMetadata]",
+												"type": "Lookup",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "AzureSqlSource",
+														"sqlReaderStoredProcedureName": "[app].[SetADLSFeedMetadata]",
+														"storedProcedureParameters": {
+															"BatchGroupId": {
+																"type": "Int32",
+																"value": {
+																	"value": "@pipeline().parameters.BatchGroupId",
+																	"type": "Expression"
+																}
+															},
+															"TableName": {
+																"type": "String",
+																"value": {
+																	"value": "@item()",
+																	"type": "Expression"
+																}
+															}
+														},
+														"queryTimeout": "02:00:00",
+														"partitionOption": "None"
+													},
+													"dataset": {
+														"referenceName": "dsMDP",
+														"type": "DatasetReference",
+														"parameters": {
+															"server": {
+																"value": "@pipeline().parameters.mdpserver",
+																"type": "Expression"
+															},
+															"db": {
+																"value": "@pipeline().parameters.mdpdb",
+																"type": "Expression"
+															},
+															"schema": "dbo",
+															"table": "Dummy"
+														}
+													}
+												}
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "2c_LoadToADLS_SQL_default",
+										"type": "ExecutePipeline",
+										"dependsOn": [
+											{
+												"activity": "LookupMetadata",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"pipeline": {
+												"referenceName": "2c_LoadToADLS_SQL",
+												"type": "PipelineReference"
+											},
+											"waitOnCompletion": true,
+											"parameters": {
+												"ExternalFeedKey": {
+													"value": "@activity('LookupMetadata').output.firstrow.FeedKey",
+													"type": "Expression"
+												},
+												"FeedCDCType": {
+													"value": "@activity('LookupMetadata').output.firstrow.FeedCDCType",
+													"type": "Expression"
+												},
+												"WorkingFileName": {
+													"value": "@activity('LookupMetadata').output.firstRow.RawFilename",
+													"type": "Expression"
+												},
+												"WorkingFilePathName": {
+													"value": "@activity('LookupMetadata').output.firstRow.FeedFullyQualifiedADLSRawPath",
+													"type": "Expression"
+												},
+												"ExternalFileName": {
+													"value": "@activity('LookupMetadata').output.firstRow.ExternalFilename",
+													"type": "Expression"
+												},
+												"LastRecordId": {
+													"value": "@activity('LookupMetadata').output.firstRow.LastRecordId",
+													"type": "Expression"
+												},
+												"RecordIdColumnName": {
+													"value": "@activity('LookupMetadata').output.firstRow.RecordIdColumnName",
+													"type": "Expression"
+												},
+												"CreateTimestampColumnName": {
+													"value": "@activity('LookupMetadata').output.firstRow.CreateTimestampColumnName",
+													"type": "Expression"
+												},
+												"DeltaReverseTimeOffsetInSecs": {
+													"value": "@activity('LookupMetadata').output.firstRow.DeltaReverseTimeOffsetInSecs",
+													"type": "Expression"
+												},
+												"LastSeenCreateTimestamp": {
+													"value": "@activity('LookupMetadata').output.firstRow.LastSeenCreateTimestamp",
+													"type": "Expression"
+												},
+												"EditTimestampColumnName": {
+													"value": "@activity('LookupMetadata').output.firstRow.EditTimestampColumnName",
+													"type": "Expression"
+												},
+												"LastSeenEditTimestamp": {
+													"value": "@activity('LookupMetadata').output.firstRow.LastSeenEditTimestamp",
+													"type": "Expression"
+												},
+												"CustomCDCQuery": {
+													"value": "@activity('LookupMetadata').output.firstRow.CustomCDCQuery",
+													"type": "Expression"
+												},
+												"WorkingColumnArray": {
+													"value": "@activity('LookupMetadata').output.firstRow.SourceColumnArray",
+													"type": "Expression"
+												},
+												"Container": {
+													"value": "@activity('LookupMetadata').output.firstRow.Container",
+													"type": "Expression"
+												},
+												"BatchSchema": {
+													"value": "@activity('LookupMetadata').output.firstRow.BatchSchema",
+													"type": "Expression"
+												},
+												"StorageURI": {
+													"value": "@pipeline().parameters.StorageURI",
+													"type": "Expression"
+												},
+												"SourceTable": {
+													"value": "@activity('LookupMetadata').output.firstRow.SourceTable",
+													"type": "Expression"
+												},
+												"FileFormat": {
+													"value": "@activity('LookupMetadata').output.firstRow.FileFormat",
+													"type": "Expression"
+												},
+												"BatchRunId": {
+													"value": "@pipeline().parameters.BatchRunId",
+													"type": "Expression"
+												},
+												"DatabaseName": {
+													"value": "@activity('LookupMetadata').output.firstRow.DatabaseName",
+													"type": "Expression"
+												},
+												"ServerName": {
+													"value": "@activity('LookupMetadata').output.firstRow.ServerName",
+													"type": "Expression"
+												},
+												"BatchGroupId": {
+													"value": "@pipeline().parameters.BatchGroupId",
+													"type": "Expression"
+												},
+												"CreateKeyFile": {
+													"value": "@activity('LookupMetadata').output.firstRow.CreateKeyFile",
+													"type": "Expression"
+												},
+												"FeedFullyQualifiedADLSKeyPath": {
+													"value": "@activity('LookupMetadata').output.firstRow.FeedFullyQualifiedADLSKeyPath",
+													"type": "Expression"
+												},
+												"KeyFileName": {
+													"value": "@activity('LookupMetadata').output.firstRow.KeyFileName",
+													"type": "Expression"
+												},
+												"KeySelectStatement": {
+													"value": "@activity('LookupMetadata').output.firstRow.KeySelectStatement",
+													"type": "Expression"
+												},
+												"BatchProcessLogId": {
+													"value": "@variables('BatchProcessLogId')",
+													"type": "Expression"
+												},
+												"mdpdb": {
+													"value": "@pipeline().parameters.mdpdb",
+													"type": "Expression"
+												},
+												"mdpserver": {
+													"value": "@pipeline().parameters.mdpserver",
+													"type": "Expression"
+												},
+												"keyvaultdnsname": {
+													"value": "@pipeline().parameters.keyvaultdnsname",
+													"type": "Expression"
+												},
+												"user": {
+													"value": "@activity('LookupMetadata').output.firstRow.UserName",
+													"type": "Expression"
+												},
+												"secret": {
+													"value": "@activity('LookupMetadata').output.firstRow.KeyVaultSecret",
+													"type": "Expression"
+												}
+											}
+										}
+									},
+									{
+										"name": "LookupMetadata",
+										"description": "exec [app].[SetADLSFeedMetadata]",
+										"type": "Lookup",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "AzureSqlSource",
+												"sqlReaderStoredProcedureName": "[app].[SetADLSFeedMetadata]",
+												"storedProcedureParameters": {
+													"BatchGroupId": {
+														"type": "Int32",
+														"value": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														}
+													},
+													"TableName": {
+														"type": "String",
+														"value": {
+															"value": "@item()",
+															"type": "Expression"
+														}
+													}
+												},
+												"queryTimeout": "02:00:00",
+												"partitionOption": "None"
+											},
+											"dataset": {
+												"referenceName": "dsMDP",
+												"type": "DatasetReference",
+												"parameters": {
+													"server": {
+														"value": "@pipeline().parameters.mdpserver",
+														"type": "Expression"
+													},
+													"db": {
+														"value": "@pipeline().parameters.mdpdb",
+														"type": "Expression"
+													},
+													"schema": "dbo",
+													"table": "Dummy"
+												}
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set Tables",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Lookup Tables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchTables",
+					"value": {
+						"value": "@activity('Lookup Tables').output.firstrow.SourceTable",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Lookup Tables",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Check Feed CDC Status",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetTablesFromBatch]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcessLogId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogProcessStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchProcessLogId",
+					"value": {
+						"value": "@activity('LogProcessStart').output.firstrow.NewProcessId",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "ForEachTable",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": " ",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error1",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "ForEachTable",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('ForEachTable').Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "2 ForEachTable",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogProcessStart",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetBatchProcessLog]",
+						"storedProcedureParameters": {
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							},
+							"NewProcessId": {
+								"type": "Int32",
+								"value": "0"
+							},
+							"ProcessBatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"ProcessDataFactoryName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().DataFactory",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineRunId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								}
+							},
+							"ProcessRunMode": {
+								"type": "String",
+								"value": "0"
+							},
+							"ProcessStreamCode": {
+								"type": "String",
+								"value": {
+									"value": "@variables('ProcessStream')",
+									"type": "Expression"
+								}
+							},
+							"ProcessTriggerId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Check Feed CDC Status",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Set BatchProcessLogId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetFeedByRules]"
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"StorageURI": {
+				"type": "string",
+				"defaultValue": "https://ukazsddatalakemdp01.dfs.core.windows.net/"
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"RunMode": {
+				"type": "string",
+				"defaultValue": "2"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "hapmdpappdbdev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "hapsqlserverdev.database.windows.net"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"BatchTables": {
+				"type": "String",
+				"defaultValue": "CustomerTransactions,IncrementalOrders"
+			},
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "SRC2ADLS"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPCore"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T20:12:30Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}
