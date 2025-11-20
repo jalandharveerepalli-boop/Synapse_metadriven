@@ -1,0 +1,1895 @@
+{
+	"name": "3_ADLSToStage",
+	"properties": {
+		"description": "external to stage to wh schema\n\n[Process Stream ADLS2EXT]\n[Process Stream EXT2STG]\n",
+		"activities": [
+			{
+				"name": "Set BatchProcessLogId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogProcessStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchProcessLogId",
+					"value": {
+						"value": "@activity('LogProcessStart').output.firstrow.NewProcessId",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "RunModeTypeSwitch",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": " ",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogProcessStart",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetBatchProcessLog]",
+						"storedProcedureParameters": {
+							"BatchRunId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchRunId",
+									"type": "Expression"
+								}
+							},
+							"NewProcessId": {
+								"type": "Int32",
+								"value": "0"
+							},
+							"ProcessBatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"ProcessDataFactoryName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().DataFactory",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineRunId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								}
+							},
+							"ProcessRunMode": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.RunMode",
+									"type": "Expression"
+								}
+							},
+							"ProcessStreamCode": {
+								"type": "String",
+								"value": {
+									"value": "@variables('ProcessStream')",
+									"type": "Expression"
+								}
+							},
+							"ProcessTriggerId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error7",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "RunModeTypeSwitch",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('RunModeTypeSwitch').Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "3 Create External Data Source PQT",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "RunModeTypeSwitch",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "Set BatchProcessLogId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.RunMode",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "1",
+							"activities": [
+								{
+									"name": "Create External File Format",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Execute 3b CSV2PQT",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												}
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External Data Source PQT",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Execute 3b CSV2PQT",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.StorageAccName",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Container": {
+												"value": "finopsparquet",
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3b CSV2PQT",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Update Late FeedKeys",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3b_FinOpsPrepareSource",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"Container": {
+												"value": "@pipeline().parameters.Container",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.globalparameterStorageURI",
+												"type": "Expression"
+											},
+											"ConnectionName": {
+												"value": "@pipeline().parameters.ConnectionName",
+												"type": "Expression"
+											},
+											"StorageAccName": {
+												"value": "@pipeline().parameters.StorageAccName",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Update Late FeedKeys",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[SetStorageExplorerFeedId]"
+									},
+									"linkedServiceName": {
+										"referenceName": "lsMDPapp",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"server": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"dbname": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3c",
+									"description": "Stage FinOps",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External File Format",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External Data Source PQT",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3c_FinOpsToExternal",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"Container": {
+												"value": "@pipeline().parameters.Container",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.globalparameterStorageURI",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"FileFormat": {
+												"value": "@pipeline().parameters.FileFormat",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3d",
+									"description": "Stage FinOps",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Execute 3c",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3d_FinOpsToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"Container": {
+												"value": "@pipeline().parameters.Container",
+												"type": "Expression"
+											},
+											"StorageURI": {
+												"value": "@pipeline().parameters.globalparameterStorageURI",
+												"type": "Expression"
+											},
+											"RunMode": {
+												"value": "@pipeline().parameters.RunMode",
+												"type": "Expression"
+											},
+											"FileFormat": {
+												"value": "@pipeline().parameters.FileFormat",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "2",
+							"activities": [
+								{
+									"name": "Create External Data Source Runmode2",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.StorageAccName",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats Runmode2",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3a RunMode2",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External Data Source Runmode2",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External File Formats Runmode2",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.storageuri",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "0",
+							"activities": [
+								{
+									"name": "Execute 3a",
+									"description": "Stage CE",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External File Formats",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External Data Source",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.storageuri",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External Data Source",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.StorageAccName",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "3",
+							"activities": [
+								{
+									"name": "Create External Data Source Runmode3",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.globalparameterStorageURI",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats Runmode3",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3a RunMode3",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External Data Source Runmode3",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External File Formats Runmode3",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.storageuri",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "4",
+							"activities": [
+								{
+									"name": "Create External Data Source Runmode3_copy1",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.globalparameterStorageURI",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats Runmode3_copy1",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3a RunMode4",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External Data Source Runmode3_copy1",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External File Formats Runmode3_copy1",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.storageuri",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "5",
+							"activities": [
+								{
+									"name": "Create External Data Source Runmode3_csv",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.globalparameterStorageURI",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats Runmode3_csv",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3a RunMode5",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External Data Source Runmode3_csv",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External File Formats Runmode3_csv",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.storageuri",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "6",
+							"activities": [
+								{
+									"name": "Create External Data Source_6",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.StorageAccName",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats_6",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3a RunMode6",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External Data Source_6",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External File Formats_6",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.storageuri",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "12",
+							"activities": [
+								{
+									"name": "Create External Data Source_12",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.StorageAccName",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats_12",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3a RunMode12",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External File Formats_12",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External Data Source_12",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.storageuri",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "8",
+							"activities": [
+								{
+									"name": "Create External Data Source_8",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalDataSource]",
+										"storedProcedureParameters": {
+											"Container": {
+												"value": {
+													"value": "@pipeline().parameters.Container",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"StorageURI": {
+												"value": {
+													"value": "@pipeline().parameters.StorageAccName",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Create External File Formats_8",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[app].[sp_CreateExternalFileFormat]",
+										"storedProcedureParameters": {
+											"FileType": {
+												"value": {
+													"value": "@pipeline().parameters.FileFormat",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "lsSynapse",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"Server": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"DB": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											}
+										}
+									}
+								},
+								{
+									"name": "Execute 3a RunMode8",
+									"type": "ExecutePipeline",
+									"dependsOn": [
+										{
+											"activity": "Create External File Formats_8",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "Create External Data Source_8",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "3a_ADLSToStage",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"BatchGroupId": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											},
+											"BatchRunId": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											},
+											"mdpdb": {
+												"value": "@pipeline().parameters.mdpdb",
+												"type": "Expression"
+											},
+											"mdpserver": {
+												"value": "@pipeline().parameters.mdpserver",
+												"type": "Expression"
+											},
+											"keyvaultdnsname": {
+												"value": "@pipeline().parameters.keyvaultdnsname",
+												"type": "Expression"
+											},
+											"workspace": {
+												"value": "@pipeline().parameters.workspace",
+												"type": "Expression"
+											},
+											"sqlpool": {
+												"value": "@pipeline().parameters.sqlpool",
+												"type": "Expression"
+											},
+											"globalparameterStorageURI": {
+												"value": "@pipeline().parameters.globalparameterStorageURI",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 7
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 1003
+			},
+			"RunMode": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"Container": {
+				"type": "string",
+				"defaultValue": "dynamics365-financeandoperations"
+			},
+			"globalparameterStorageURI": {
+				"type": "string",
+				"defaultValue": "https://edpdevrtkdls002.dfs.core.windows.net"
+			},
+			"FileFormat": {
+				"type": "string",
+				"defaultValue": "parquet"
+			},
+			"globalparameterContainerCDM": {
+				"type": "string",
+				"defaultValue": "serverless-cdm"
+			},
+			"globalparameterFolderCDM": {
+				"type": "string",
+				"defaultValue": "DEV"
+			},
+			"globalparameterStorageAccountCDM": {
+				"type": "string",
+				"defaultValue": "stmdpdls001.dfs.core.windows.net"
+			},
+			"globalparameterSQLEndPoint": {
+				"type": "string",
+				"defaultValue": "Server=mdp-synws-dev-ondemand.sql.azuresynapse.net;Database=AdHocAnalysis;Uid=sqladminuser;Pwd=Ra3&78ndom^83Ju83%nk"
+			},
+			"globalparameterStorageTenantID": {
+				"type": "string",
+				"defaultValue": "e85feadf-11e7-47bb-a160-43b98dcc96f1"
+			},
+			"globalparameterDataSourceNameCDM": {
+				"type": "string",
+				"defaultValue": "datasourceCDMdev"
+			},
+			"ConnectionName": {
+				"type": "string"
+			},
+			"StorageAccName": {
+				"type": "string"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "hapmdpappdbdev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "hapsqlserverdev.database.windows.net"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"workspace": {
+				"type": "string"
+			},
+			"sqlpool": {
+				"type": "string"
+			},
+			"storageuri": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "ADLS2STG"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPCore"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T20:01:54Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

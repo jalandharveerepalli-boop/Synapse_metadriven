@@ -1,0 +1,1302 @@
+{
+	"name": "0_AcceleratorControl",
+	"properties": {
+		"description": "Build 1-2-3-4\n\nRunMode\n0 = Skip SourceToADLS (FinOps)\n1 = finops Run in Full  (File to Parquet)\n2 = Oracle Source \n3 = azure sql \n4 = on prem sql \n5 = csv \n6 = xlsx\n7 = synapse",
+		"activities": [
+			{
+				"name": "3_ADLStoStage",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Unpause Using SQL Pool Mode",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "3_ADLSToStage",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchGroupId": {
+							"value": "@pipeline().parameters.BatchGroupId",
+							"type": "Expression"
+						},
+						"BatchRunId": {
+							"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+							"type": "Expression"
+						},
+						"RunMode": {
+							"value": "@pipeline().parameters.RunMode",
+							"type": "Expression"
+						},
+						"Container": {
+							"value": "@activity('Get BatchRunTime').output.firstrow.AppADLSRawContainer",
+							"type": "Expression"
+						},
+						"globalparameterStorageURI": {
+							"value": "@pipeline().parameters.globalparameterStorageURI",
+							"type": "Expression"
+						},
+						"FileFormat": {
+							"value": "@activity('Get BatchRunTime').output.firstrow.AppADLSFileExtension",
+							"type": "Expression"
+						},
+						"globalparameterContainerCDM": {
+							"value": "@pipeline().parameters.globalparameterContainerCDM",
+							"type": "Expression"
+						},
+						"globalparameterFolderCDM": {
+							"value": "@pipeline().parameters.globalparameterFolderCDM",
+							"type": "Expression"
+						},
+						"globalparameterStorageAccountCDM": {
+							"value": "@pipeline().parameters.globalparameterStorageAccountCDM",
+							"type": "Expression"
+						},
+						"globalparameterSQLEndPoint": {
+							"value": "@pipeline().parameters.globalparameterSQLEndPoint",
+							"type": "Expression"
+						},
+						"globalparameterStorageTenantID": {
+							"value": "@pipeline().parameters.globalparameterStorageTenantID",
+							"type": "Expression"
+						},
+						"globalparameterDataSourceNameCDM": {
+							"value": "@pipeline().parameters.globalparameterDataSourceNameCDM",
+							"type": "Expression"
+						},
+						"ConnectionName": {
+							"value": "@pipeline().parameters.globalparameterStorageConnectionString",
+							"type": "Expression"
+						},
+						"StorageAccName": {
+							"value": "@pipeline().parameters.globalparameterStorageURI",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"keyvaultdnsname": {
+							"value": "@pipeline().parameters.KeyVaultDNSName",
+							"type": "Expression"
+						},
+						"workspace": {
+							"value": "@pipeline().parameters.workspace",
+							"type": "Expression"
+						},
+						"sqlpool": {
+							"value": "@pipeline().parameters.sqlpool",
+							"type": "Expression"
+						},
+						"storageuri": {
+							"value": "@pipeline().parameters.globalparameterStorageURI",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcessLogId",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "LogProcessStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "BatchProcessLogId",
+					"value": {
+						"value": "@activity('LogProcessStart').output.firstrow.NewProcessId",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set BatchTelemetry Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "4_StageToWarehouse",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchTelemetryClose]",
+					"storedProcedureParameters": {
+						"BatchRunId": {
+							"value": {
+								"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int16"
+						},
+						"ProcessStreamCode": {
+							"value": "ORCHESTRATION",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "4_StageToWarehouse",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "3_ADLStoStage",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "4_StageToWarehouse",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchGroupId": {
+							"value": "@pipeline().parameters.BatchGroupId",
+							"type": "Expression"
+						},
+						"BatchRunId": {
+							"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+							"type": "Expression"
+						},
+						"RunMode": {
+							"value": "@pipeline().parameters.RunMode",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"keyvaultdnsname": {
+							"value": "@pipeline().parameters.KeyVaultDNSName",
+							"type": "Expression"
+						},
+						"sqlpool": {
+							"value": "@pipeline().parameters.sqlpool",
+							"type": "Expression"
+						},
+						"workspace": {
+							"value": "@pipeline().parameters.workspace",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "4_StageToWarehouse",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@activity('LogProcessStart').output.firstrow.NewProcessId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": " ",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "SetGet BatchRunId",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetBatchTelemetry]",
+						"storedProcedureParameters": {
+							"BatchDataFactoryName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().DataFactory",
+									"type": "Expression"
+								}
+							},
+							"BatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"BatchPipelineName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								}
+							},
+							"BatchPipelineRunId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								}
+							},
+							"BatchTriggerId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								}
+							},
+							"BatchTriggerName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerName",
+									"type": "Expression"
+								}
+							},
+							"BatchTriggerType": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerType",
+									"type": "Expression"
+								}
+							},
+							"BatchRunMode": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.RunMode",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "LogProcessStart",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set Var TeamsWebhook",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set Var DiscoveryWebhook",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set Var StorageConnectionString",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[SetBatchProcessLog]",
+						"storedProcedureParameters": {
+							"BatchRunId": {
+								"type": "String",
+								"value": {
+									"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+									"type": "Expression"
+								}
+							},
+							"NewProcessId": {
+								"type": "String",
+								"value": "0"
+							},
+							"ProcessBatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							},
+							"ProcessDataFactoryName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().DataFactory",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								}
+							},
+							"ProcessPipelineRunId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								}
+							},
+							"ProcessRunMode": {
+								"type": "String",
+								"value": {
+									"value": "@if(equals(pipeline().parameters.RunMode,0),'entitystore','finops')",
+									"type": "Expression"
+								}
+							},
+							"ProcessStreamCode": {
+								"type": "String",
+								"value": {
+									"value": "@variables('ProcessStream')",
+									"type": "Expression"
+								}
+							},
+							"ProcessTriggerId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().TriggerId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get BatchRunTime",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "SetGet BatchRunId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetBatchRunTime]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Pause if Outside Business Hours",
+				"description": "set outside business hours in this expression    h01  h02   h03    ",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "5_RefreshPBIDataset",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@contains('h01h02h03h04h05h06h07h18h19h20h21h22h23h24',concat('h',substring(formatDateTime(utcnow()),11,2)))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Wait3",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Unpause Using SQL Pool Mode",
+				"description": " ",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "2_SourceToADLS",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.RunMode,3)",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 60
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "serverless no need to unpause",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "1 Run Discovery",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "LogProcessStart",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.SkipDiscovery,'0')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Discovery Pipeline Skipped",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "1_Discovery",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "1_Discovery",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"BatchGroupId": {
+										"value": "@pipeline().parameters.BatchGroupId",
+										"type": "Expression"
+									},
+									"BatchRunId": {
+										"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+										"type": "Expression"
+									},
+									"RunMode": {
+										"value": "@pipeline().parameters.RunMode",
+										"type": "Expression"
+									},
+									"StorageURI": {
+										"value": "@activity('Get BatchRunTime').output.firstrow.StorageURI",
+										"type": "Expression"
+									},
+									"Container": {
+										"value": "@activity('Get BatchRunTime').output.firstrow.AppADLSRawContainer",
+										"type": "Expression"
+									},
+									"DiscoveryWebhook": {
+										"value": "@activity('Get BatchRunTime').output.firstrow.DiscoveryWebhook",
+										"type": "Expression"
+									},
+									"StorageConnectionString": {
+										"value": "@activity('Get BatchRunTime').output.firstrow.StorageConnectionString",
+										"type": "Expression"
+									},
+									"mdpdb": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									},
+									"mdpserver": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"keyvaultdnsname": {
+										"value": "@pipeline().parameters.KeyVaultDNSName",
+										"type": "Expression"
+									},
+									"mdpsparkpool": {
+										"value": "@pipeline().parameters.mdpsparkpool",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Set BatchTelemetry Error P1",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "1_Discovery",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "ProcessBatchTelemetryError",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"mdpserver": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"mdpdb": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									},
+									"BatchRunId": {
+										"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+										"type": "Expression"
+									},
+									"ErrorMessage": {
+										"value": "@{activity('1_Discovery').Error.Message}",
+										"type": "Expression"
+									},
+									"SuccessFlag": "0",
+									"ProcessStreamCode": "DSC2APP1",
+									"suspendwebhook": {
+										"value": "@pipeline().parameters.globalparameterPauseWebhook",
+										"type": "Expression"
+									},
+									"body": {
+										"value": "@concat('{\n\"SynapseSqlPool\":\"',pipeline().parameters.sqlpool,'\",',\n'\"resourceGroupName\":\"', pipeline().parameters.resourcegroup,'\",',\n'\"SynapseWorkspaceName\":\"',pipeline().parameters.workspace,'\"\n}'\n)",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "5_RefreshPBIDataset",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Set BatchTelemetry Close",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set BatchProcess Close",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "5_RefreshPBIDataset",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchGroupId": {
+							"value": "@pipeline().parameters.BatchGroupId",
+							"type": "Expression"
+						},
+						"BatchRunId": {
+							"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+							"type": "Expression"
+						},
+						"RunMode": {
+							"value": "@pipeline().parameters.RunMode",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"keyvaultdnsname": {
+							"value": "@pipeline().parameters.KeyVaultDNSName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set Var TeamsWebhook",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get BatchRunTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "TeamsWebhook",
+					"value": {
+						"value": "@activity('Get BatchRunTime').output.firstrow.NotificationWebhook",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Var DiscoveryWebhook",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get BatchRunTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DiscoveryWebhook",
+					"value": {
+						"value": "@activity('Get BatchRunTime').output.firstrow.DiscoveryWebhook",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Var StorageConnectionString",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get BatchRunTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "StorageConnectionString",
+					"value": {
+						"value": "@pipeline().parameters.globalparameterStorageConnectionString",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "2_SourceToADLS",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Set BatchProcessLogId",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "1 Run Discovery",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "2_SourceToADLS",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchGroupId": {
+							"value": "@pipeline().parameters.BatchGroupId",
+							"type": "Expression"
+						},
+						"StorageURI": {
+							"value": "@pipeline().parameters.globalparameterStorageURI",
+							"type": "Expression"
+						},
+						"BatchRunId": {
+							"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+							"type": "Expression"
+						},
+						"RunMode": {
+							"value": "@pipeline().parameters.RunMode",
+							"type": "Expression"
+						},
+						"globalparameterStorageAccountCDM": {
+							"value": "@pipeline().parameters.globalparameterStorageAccountCDM",
+							"type": "Expression"
+						},
+						"globalparameterContainerCDM": {
+							"value": "@pipeline().parameters.globalparameterContainerCDM",
+							"type": "Expression"
+						},
+						"globalparameterFolderCDM": {
+							"value": "@pipeline().parameters.globalparameterFolderCDM",
+							"type": "Expression"
+						},
+						"globalparameterStorageSchemaCDM": {
+							"value": "@pipeline().parameters.globalparameterStorageSchemaCDM",
+							"type": "Expression"
+						},
+						"globalparameterStoragePartitionSizeMB": {
+							"value": "@pipeline().parameters.globalparameterStoragePartitionSizeMB",
+							"type": "Expression"
+						},
+						"globalparameterStorageTenantID": {
+							"value": "@pipeline().parameters.globalparameterStorageTenantID",
+							"type": "Expression"
+						},
+						"globalparameterSQLEndPoint": {
+							"value": "@pipeline().parameters.globalparameterSQLEndPoint",
+							"type": "Expression"
+						},
+						"globalparameterDataSourceNameCDM": {
+							"value": "@pipeline().parameters.globalparameterDataSourceNameCDM",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"keyvaultdnsname": {
+							"value": "@pipeline().parameters.KeyVaultDNSName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchTelemetry Error P2",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "2_SourceToADLS",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ProcessBatchTelemetryError",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"BatchRunId": {
+							"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+							"type": "Expression"
+						},
+						"ErrorMessage": {
+							"value": "@{activity('2_SourceToADLS').Error.Message}",
+							"type": "Expression"
+						},
+						"SuccessFlag": "0",
+						"ProcessStreamCode": "DSC2APP1",
+						"suspendwebhook": {
+							"value": "@pipeline().parameters.globalparameterPauseWebhook",
+							"type": "Expression"
+						},
+						"body": {
+							"value": "@concat('{\n\"SynapseSqlPool\":\"',pipeline().parameters.sqlpool,'\",',\n'\"resourceGroupName\":\"', pipeline().parameters.resourcegroup,'\",',\n'\"SynapseWorkspaceName\":\"',pipeline().parameters.workspace,'\"\n}'\n)",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchTelemetry Error P3",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "3_ADLStoStage",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ProcessBatchTelemetryError",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"BatchRunId": {
+							"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+							"type": "Expression"
+						},
+						"ErrorMessage": {
+							"value": "@{activity('3_ADLStoStage').Error.Message}",
+							"type": "Expression"
+						},
+						"SuccessFlag": "0",
+						"ProcessStreamCode": "ADLS2STG",
+						"suspendwebhook": {
+							"value": "@pipeline().parameters.globalparameterPauseWebhook",
+							"type": "Expression"
+						},
+						"body": {
+							"value": "@concat('{\n\"SynapseSqlPool\":\"',pipeline().parameters.sqlpool,'\",',\n'\"resourceGroupName\":\"', pipeline().parameters.resourcegroup,'\",',\n'\"SynapseWorkspaceName\":\"',pipeline().parameters.workspace,'\"\n}'\n)",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchTelemetry Error P4",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "4_StageToWarehouse",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ProcessBatchTelemetryError",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"BatchRunId": {
+							"value": "@activity('SetGet BatchRunId').output.firstrow.NewRunId",
+							"type": "Expression"
+						},
+						"ErrorMessage": {
+							"value": "@{activity('4_StageToWarehouse').Error.Message}",
+							"type": "Expression"
+						},
+						"SuccessFlag": "0",
+						"ProcessStreamCode": "STG2WAR",
+						"suspendwebhook": {
+							"value": "@pipeline().parameters.globalparameterPauseWebhook",
+							"type": "Expression"
+						},
+						"body": {
+							"value": "@concat('{\n\"SynapseSqlPool\":\"',pipeline().parameters.sqlpool,'\",',\n'\"resourceGroupName\":\"', pipeline().parameters.resourcegroup,'\",',\n'\"SynapseWorkspaceName\":\"',pipeline().parameters.workspace,'\"\n}'\n)",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"RunMode": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"SkipDiscovery": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"globalparameterStorageURI": {
+				"type": "string",
+				"defaultValue": "https://hapdatastorageactdev.dfs.core.windows.net"
+			},
+			"globalparameterStorageConnectionString": {
+				"type": "string",
+				"defaultValue": "DefaultEndpointsProtocol=https;AccountName=hapdatastorageactdev;AccountKey=1fNd64N1c2WPmICGgnjBtRoKrLJ8ihec9vT5Sr7Yz3hjceKfVi2ydAC5NDIt42UQq/S4aFtkMVggvGZm9xt4pg==;EndpointSuffix=core.windows.net"
+			},
+			"globalparameterNotificationWebhook": {
+				"type": "string",
+				"defaultValue": "https://hsdyn.webhook.office.com/webhookb2/947a2a9c-3f68-4855-8231-2d6331983409@e85feadf-11e7-47bb-a160-43b98dcc96f1/IncomingWebhook/7ddd6141b3464ca9835db9dbf7b1af9b/d1f03595-767f-4608-bbd7-70f1e9eea903"
+			},
+			"globalparameterDiscoveryWebhook": {
+				"type": "string",
+				"defaultValue": "https://256e409d-620d-4556-ad19-9382a5485b04.webhook.uks.azure-automation.net/webhooks?token=O165LpVa2c44XrK0fpNvmnuM2wMXrEMhRuQ9Af1%2bMPo%3d"
+			},
+			"globalparameterPauseWebhook": {
+				"type": "string",
+				"defaultValue": "https://a5ad4bcc-5505-4b38-bed1-2567b5721dd2.webhook.ne.azure-automation.net/webhooks?token=VmetweJww1xBxuzrx2KwovCj2cYd%2fTxF4LsE4FRerZs%3d"
+			},
+			"globalparameterStartWebhook": {
+				"type": "string",
+				"defaultValue": "https://a5ad4bcc-5505-4b38-bed1-2567b5721dd2.webhook.ne.azure-automation.net/webhooks?token=91m4kcdqeCELSNbXweKL0IHX9TGaz9OiEmKxiE5V1iE%3d"
+			},
+			"globalparameterScaleWebhook": {
+				"type": "string"
+			},
+			"globalparameterRunbookSubscription": {
+				"type": "string"
+			},
+			"globalparameterRunbookResourceGroup": {
+				"type": "string"
+			},
+			"globalparameterContainerCDM": {
+				"type": "string",
+				"defaultValue": "serverless-cdm"
+			},
+			"globalparameterFolderCDM": {
+				"type": "string",
+				"defaultValue": "DEV"
+			},
+			"globalparameterStorageAccountCDM": {
+				"type": "string",
+				"defaultValue": "stmdpdls001.dfs.core.windows.net"
+			},
+			"globalparameterStorageSchemaCDM": {
+				"type": "string",
+				"defaultValue": "tables"
+			},
+			"globalparameterDataSourceNameCDM": {
+				"type": "string",
+				"defaultValue": "datasourceCDMdev"
+			},
+			"globalparameterManifestName": {
+				"type": "string",
+				"defaultValue": "Custom"
+			},
+			"globalparameterStoragePartitionSizeMB": {
+				"type": "int",
+				"defaultValue": 200
+			},
+			"globalparameterStorageTenantID": {
+				"type": "string",
+				"defaultValue": "e85feadf-11e7-47bb-a160-43b98dcc96f1"
+			},
+			"globalparameterSQLEndPoint": {
+				"type": "string"
+			},
+			"globalparamaterKeyVaultDNSName": {
+				"type": "string",
+				"defaultValue": "https://hapkeyvaultdev.vault.azure.net/"
+			},
+			"KeyVaultDNSName": {
+				"type": "string",
+				"defaultValue": "https://hapkeyvaultdev.vault.azure.net/"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"workspace": {
+				"type": "string"
+			},
+			"sqlpool": {
+				"type": "string"
+			},
+			"resourcegroup": {
+				"type": "string"
+			},
+			"subid": {
+				"type": "string"
+			},
+			"mdpsparkpool": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"BatchRunId": {
+				"type": "String",
+				"defaultValue": "999"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "999"
+			},
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "ORCHESTRATION"
+			},
+			"Container": {
+				"type": "String",
+				"defaultValue": "d365"
+			},
+			"FileFormat": {
+				"type": "String",
+				"defaultValue": "parquet"
+			},
+			"RunbookServerName": {
+				"type": "String"
+			},
+			"RunbookDatabaseName": {
+				"type": "String"
+			},
+			"TeamsWebhook": {
+				"type": "String"
+			},
+			"StorageURI": {
+				"type": "String"
+			},
+			"DiscoveryWebhook": {
+				"type": "String"
+			},
+			"RunbookSubscription": {
+				"type": "String"
+			},
+			"RunbookResourceGroup": {
+				"type": "String"
+			},
+			"StorageConnectionString": {
+				"type": "String"
+			},
+			"mdpdb": {
+				"type": "String"
+			},
+			"mdpserver": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "MDPCore"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T20:23:32Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

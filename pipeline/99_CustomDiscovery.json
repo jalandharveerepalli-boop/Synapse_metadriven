@@ -1,0 +1,198 @@
+{
+	"name": "99_CustomDiscovery",
+	"properties": {
+		"activities": [
+			{
+				"name": "FeedLookup",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Get mdpserver from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get mdpdb from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "@concat('select \nfeedkey as feedkey\n,batchgroupid as batchgroupid\n,sourcetable as sourcetable\n,sourceschema as sourceschema \nfrom app.feed\nwhere batchgroupid =', pipeline().parameters.BatchGroupId\n,'and isenabled = 1 \nand isextracted = 1')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@concat(activity('Get mdpserver from Azure Key Vault').output.value,'.database.windows.net')",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@activity('Get mdpdb from Azure Key Vault').output.value",
+								"type": "Expression"
+							},
+							"schema": "app",
+							"table": "feed"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "FeedLookup",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('FeedLookup').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "99a_CustomDiscovery",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "99a_CustomDiscovery",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"BatchGroupId": {
+										"value": "@pipeline().parameters.BatchGroupId",
+										"type": "Expression"
+									},
+									"mdpserver": {
+										"value": "@concat(activity('Get mdpserver from Azure Key Vault').output.value,'.database.windows.net')",
+										"type": "Expression"
+									},
+									"mdpdb": {
+										"value": "@activity('Get mdpdb from Azure Key Vault').output.value",
+										"type": "Expression"
+									},
+									"FeedKey": {
+										"value": "@item().feedkey",
+										"type": "Expression"
+									},
+									"TableName": {
+										"value": "@item().sourcetable",
+										"type": "Expression"
+									},
+									"SchemaName": {
+										"value": "@item().sourceschema",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get mdpdb from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/mdpdb?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get mdpserver from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/mdpserver?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"KeyVault": {
+				"type": "string",
+				"defaultValue": "developmentmdpkv2003"
+			}
+		},
+		"folder": {
+			"name": "MDPUtil"
+		},
+		"annotations": []
+	}
+}

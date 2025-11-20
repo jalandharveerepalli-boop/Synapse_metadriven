@@ -1,0 +1,462 @@
+{
+	"name": "3a1_ADLSToStage_AzureSQL",
+	"properties": {
+		"description": "[Process Stream Code = ADLS2STG]",
+		"activities": [
+			{
+				"name": "Drop and Create Stage Table",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Get Table Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetCreateExternalStageTable]",
+						"storedProcedureParameters": {
+							"ColumList": {
+								"type": "String",
+								"value": {
+									"value": "@activity('Get Table Metadata').output.firstRow.ColumnList",
+									"type": "Expression"
+								}
+							},
+							"TableName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.StageTableName",
+									"type": "Expression"
+								}
+							},
+							"SchemaName": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.ExternalSchemaName",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsSQLDestination",
+						"type": "DatasetReference",
+						"parameters": {
+							"DatabaseName": {
+								"value": "@pipeline().parameters.ExternalDatabaseName",
+								"type": "Expression"
+							},
+							"ServerName": {
+								"value": "@pipeline().parameters.ExternalDatabaseServerName",
+								"type": "Expression"
+							},
+							"keyvaultdnsname": {
+								"value": "@pipeline().parameters.keyvaultdnsname",
+								"type": "Expression"
+							},
+							"user": {
+								"value": "@pipeline().parameters.ExternalDatabaseUserName",
+								"type": "Expression"
+							},
+							"secret": {
+								"value": "@pipeline().parameters.ExternalDatabaseKeyVaultSecret",
+								"type": "Expression"
+							},
+							"table": "dummy",
+							"schema": "dbo"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get Table Metadata",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetExternalFieldsForExternalStaging]",
+						"storedProcedureParameters": {
+							"FeedKey": {
+								"type": "Int64",
+								"value": {
+									"value": "@pipeline().parameters.FeedKey",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Copy Parquet to SQL",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Drop and Create Stage Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "dsParquet",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.ADLSContainer",
+								"type": "Expression"
+							},
+							"Folder": {
+								"value": "@pipeline().parameters.ADLSFolder",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@pipeline().parameters.ExternalTableNameADLS",
+								"type": "Expression"
+							},
+							"storageuri": {
+								"value": "@pipeline().parameters.globalparameterStorageURI",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "dsSQLDestination",
+						"type": "DatasetReference",
+						"parameters": {
+							"DatabaseName": {
+								"value": "@pipeline().parameters.ExternalDatabaseName",
+								"type": "Expression"
+							},
+							"ServerName": {
+								"value": "@pipeline().parameters.ExternalDatabaseServerName",
+								"type": "Expression"
+							},
+							"keyvaultdnsname": {
+								"value": "@pipeline().parameters.keyvaultdnsname",
+								"type": "Expression"
+							},
+							"user": {
+								"value": "@pipeline().parameters.ExternalDatabaseUserName",
+								"type": "Expression"
+							},
+							"secret": {
+								"value": "@pipeline().parameters.ExternalDatabaseKeyVaultSecret",
+								"type": "Expression"
+							},
+							"table": {
+								"value": "@pipeline().parameters.StageTableName",
+								"type": "Expression"
+							},
+							"schema": {
+								"value": "@pipeline().parameters.ExternalSchemaName",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Set BatchProcess Close",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy Parquet to SQL",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": " ",
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "1",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": " ",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error5",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Copy Parquet to SQL",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@variables('BatchProcessLogId')",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@{activity('Copy Parquet to SQL').output.Error.Message}",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "3a1 Copy CDC Parquet to SQL",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"BatchRunId": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"workspace": {
+				"type": "string"
+			},
+			"sqlpool": {
+				"type": "string"
+			},
+			"IntegrationControlKey": {
+				"type": "int"
+			},
+			"CDCGroupType": {
+				"type": "int"
+			},
+			"RowCDCType": {
+				"type": "int"
+			},
+			"ExternalTableName": {
+				"type": "string"
+			},
+			"StagingTableName": {
+				"type": "string"
+			},
+			"FeedKey": {
+				"type": "int"
+			},
+			"ExternalTableNameADLS": {
+				"type": "string"
+			},
+			"CreateTimestampColumnName": {
+				"type": "string"
+			},
+			"EditTimestampColumnName": {
+				"type": "string"
+			},
+			"RecordIdColumnName": {
+				"type": "string"
+			},
+			"CreateKeyFile": {
+				"type": "int"
+			},
+			"ExternalStagedOutputType": {
+				"type": "int"
+			},
+			"ExternalDatabaseName": {
+				"type": "string"
+			},
+			"ExternalDatabaseServerName": {
+				"type": "string"
+			},
+			"ExternalDatabaseKeyVaultSecret": {
+				"type": "string"
+			},
+			"ExternalDatabaseUserName": {
+				"type": "string"
+			},
+			"ExternalSchemaName": {
+				"type": "string"
+			},
+			"ADLSContainer": {
+				"type": "string"
+			},
+			"ADLSFolder": {
+				"type": "string"
+			},
+			"globalparameterStorageURI": {
+				"type": "string"
+			},
+			"StageTableName": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "ADLS2STG"
+			},
+			"BatchProcessLogId": {
+				"type": "String",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"standard load eg CE"
+		],
+		"lastPublishTime": "2022-02-06T13:25:25Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

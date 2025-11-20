@@ -1,0 +1,91 @@
+{
+	"name": "SetBatchProcessCloseError",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set BatchProcess Close Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchProcessLogId",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@pipeline().parameters.ErrorMessage",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": {
+								"value": "@pipeline().parameters.SuccessFlag",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": {
+								"value": "@pipeline().parameters.ErrorObject",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp_Azure",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"mdpserver": {
+				"type": "string"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"BatchProcessLogId": {
+				"type": "string"
+			},
+			"ErrorMessage": {
+				"type": "string"
+			},
+			"SuccessFlag": {
+				"type": "int"
+			},
+			"ErrorObject": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "MDPUtil"
+		},
+		"annotations": []
+	}
+}

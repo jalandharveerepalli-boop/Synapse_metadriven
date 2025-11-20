@@ -1,0 +1,326 @@
+{
+	"name": "01a_PreProcess_CSV_Output",
+	"properties": {
+		"activities": [
+			{
+				"name": "ForEach AboveFolder",
+				"type": "ForEach",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.Level_Above_List",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Cleaned to Raw",
+							"description": "Sort cleaned files into Raw parent folder and subsequent census-part folders",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": false,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsADLSfile",
+									"type": "DatasetReference",
+									"parameters": {
+										"blobfolder": {
+											"value": "@item().path",
+											"type": "Expression"
+										},
+										"blobcontainer": {
+											"value": "@pipeline().parameters.container",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@pipeline().parameters.storage_uri",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsADLSfile",
+									"type": "DatasetReference",
+									"parameters": {
+										"blobfolder": {
+											"value": "@concat(replace(pipeline().parameters.parentfolders,'input','raw'),pipeline().parameters.feed_folder)",
+											"type": "Expression"
+										},
+										"blobcontainer": {
+											"value": "@pipeline().parameters.container",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@substring(item().path,lastIndexOf(item().path,'/'),sub(length(item().path),lastIndexOf(item().path,'/')))",
+											"type": "Expression"
+										},
+										"storageuri": {
+											"value": "@pipeline().parameters.storage_uri",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Set BatchProcess Close Error",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Cleaned to Raw",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchProcessLogId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('Cleaned to Raw').Error.Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "01a Input to Raw",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "01b PreProcess CSV Headers",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "ForEach AboveFolder",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "01b_PreProcess_CSV_Headers",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"folder": {
+							"value": "@concat(replace(pipeline().parameters.parentfolders,'input','raw'),pipeline().parameters.feed_folder)",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@pipeline().parameters.container",
+							"type": "Expression"
+						},
+						"storageuri": {
+							"value": "@pipeline().parameters.storage_uri",
+							"type": "Expression"
+						},
+						"FeedKey": {
+							"value": "@pipeline().parameters.FeedKey",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"BatchGroupID": {
+							"value": "@pipeline().parameters.BatchGroupID",
+							"type": "Expression"
+						},
+						"feed_folder": {
+							"value": "@pipeline().parameters.feed_folder",
+							"type": "Expression"
+						},
+						"BatchRunID": {
+							"value": "@pipeline().parameters.BatchRunID",
+							"type": "Expression"
+						},
+						"BatchProcessLogID": {
+							"value": "@pipeline().parameters.BatchProcessLogID",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Level_Above_List": {
+				"type": "array"
+			},
+			"container": {
+				"type": "string"
+			},
+			"parentfolders": {
+				"type": "string"
+			},
+			"datastartrow": {
+				"type": "int"
+			},
+			"feed_folder": {
+				"type": "string"
+			},
+			"storage_uri": {
+				"type": "string"
+			},
+			"FeedKey": {
+				"type": "string"
+			},
+			"CompressionType": {
+				"type": "string"
+			},
+			"ColumnDelimiter": {
+				"type": "string"
+			},
+			"RowDelimiter": {
+				"type": "string"
+			},
+			"Encoding": {
+				"type": "string"
+			},
+			"EscapeCharacter": {
+				"type": "string"
+			},
+			"QuoteCharacter": {
+				"type": "string"
+			},
+			"FirstRowAsHeader": {
+				"type": "string"
+			},
+			"NullValue": {
+				"type": "string"
+			},
+			"CompressionLevel": {
+				"type": "string"
+			},
+			"BatchGroupID": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"BatchRunID": {
+				"type": "int"
+			},
+			"BatchProcessLogID": {
+				"type": "int"
+			}
+		},
+		"variables": {
+			"FileName": {
+				"type": "String"
+			},
+			"LeftPos": {
+				"type": "String"
+			},
+			"RightPos": {
+				"type": "String"
+			},
+			"FileNameFixed": {
+				"type": "String"
+			},
+			"CSVParams": {
+				"type": "Array"
+			}
+		},
+		"folder": {
+			"name": "MDPPreProcess"
+		},
+		"annotations": []
+	}
+}

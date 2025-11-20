@@ -1,0 +1,226 @@
+{
+	"name": "5a_LookupPBIDataset",
+	"properties": {
+		"activities": [
+			{
+				"name": "Lookup PBI Datasets",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetPowerBIDatasetFromBatch]",
+						"storedProcedureParameters": {
+							"BatchGroupID": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "ForEachPBIDataset",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Set PBI Datasets",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@split(variables('PBIDatasets'), ',')",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "LookupMetadata",
+							"description": "exec [app].[SetPBIDatasetMetadata]",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[app].[SetPBIDatasetMetadata]",
+									"storedProcedureParameters": {
+										"BatchGroupId": {
+											"type": "Int32",
+											"value": {
+												"value": "@pipeline().parameters.BatchGroupId",
+												"type": "Expression"
+											}
+										},
+										"DatasetName": {
+											"type": "String",
+											"value": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								}
+							}
+						},
+						{
+							"name": "5b_RefreshPBIDataset",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "LookupMetadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "5b_RefreshPBIDataset",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"PBIAppWorkspaceId": {
+										"value": "@activity('LookupMetadata').output.firstrow.WorkspaceID",
+										"type": "Expression"
+									},
+									"PBIDatasetId": {
+										"value": "@activity('LookupMetadata').output.firstrow.DatasetID",
+										"type": "Expression"
+									},
+									"BatchGroupId": {
+										"value": "@pipeline().parameters.BatchGroupId",
+										"type": "Expression"
+									},
+									"BatchRunId": {
+										"value": "@pipeline().parameters.BatchRunId",
+										"type": "Expression"
+									},
+									"RunMode": {
+										"value": "@pipeline().parameters.RunMode",
+										"type": "Expression"
+									},
+									"KeyVaultDNSName": {
+										"value": "@pipeline().parameters.keyvaultdnsname",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set PBI Datasets",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Lookup PBI Datasets",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PBIDatasets",
+					"value": {
+						"value": "@activity('Lookup PBI Datasets').output.firstrow.DatasetName",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int"
+			},
+			"BatchRunId": {
+				"type": "int"
+			},
+			"RunMode": {
+				"type": "int"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"PBIDatasets": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T19:35:01Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

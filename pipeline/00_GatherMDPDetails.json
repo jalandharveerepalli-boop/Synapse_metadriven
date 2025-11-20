@@ -1,0 +1,723 @@
+{
+	"name": "00_GatherMDPDetails",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get mdpdb from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/mdpdb?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get mdpserver from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/mdpserver?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get storageuri from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait0",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/storageuri?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Wait2",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "Get mdpdb from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get mdpserver from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get mdpsparkpool from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 1
+				}
+			},
+			{
+				"name": "0_AcceleratorControl",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get sqlpool from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get workspace from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "0_AcceleratorControl",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"BatchGroupId": {
+							"value": "@pipeline().parameters.BatchGroupId",
+							"type": "Expression"
+						},
+						"RunMode": {
+							"value": "@pipeline().parameters.RunMode",
+							"type": "Expression"
+						},
+						"SkipDiscovery": {
+							"value": "@pipeline().parameters.SkipDiscovery",
+							"type": "Expression"
+						},
+						"globalparameterStorageURI": {
+							"value": "@activity('Get storageuri from Azure Key Vault').output.value",
+							"type": "Expression"
+						},
+						"globalparameterStorageConnectionString": {
+							"value": "@concat('DefaultEndpointsProtocol=https;AccountName=',activity('Get storage from Azure Key Vault').output.value,';AccountKey=',activity('Get storagekey from Azure Key Vault').output.value,';EndpointSuffix=core.windows.net')\n",
+							"type": "Expression"
+						},
+						"globalparameterStorageTenantID": {
+							"value": "@activity('Get TenantId from Azure Key Vault').output.value",
+							"type": "Expression"
+						},
+						"globalparamaterKeyVaultDNSName": {
+							"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net')",
+							"type": "Expression"
+						},
+						"KeyVaultDNSName": {
+							"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net')",
+							"type": "Expression"
+						},
+						"mdpdb": {
+							"value": "@activity('Get mdpdb from Azure Key Vault').output.value",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@concat(activity('Get mdpserver from Azure Key Vault').output.value,'.database.windows.net')",
+							"type": "Expression"
+						},
+						"workspace": {
+							"value": "@activity('Get workspace from Azure Key Vault').output.value",
+							"type": "Expression"
+						},
+						"sqlpool": {
+							"value": "@activity('Get sqlpool from Azure Key Vault').output.value",
+							"type": "Expression"
+						},
+						"resourcegroup": {
+							"value": "@activity('Get RG from Azure Key Vault').output.value",
+							"type": "Expression"
+						},
+						"subid": {
+							"value": "@activity('Get SubId from Azure Key Vault').output.value",
+							"type": "Expression"
+						},
+						"mdpsparkpool": {
+							"value": "@activity('Get mdpsparkpool from Azure Key Vault').output.value",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get TenantId from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/tenantid?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Wait1",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "Get storagekey from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get storage from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get storageuri from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 1
+				}
+			},
+			{
+				"name": "Get storagekey from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait0",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/adls?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get storage from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait0",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/storage?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Wait0",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "Get TenantId from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get SubId from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get RG from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 1
+				}
+			},
+			{
+				"name": "Get SubId from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/subid?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get RG from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/resourcegroup?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get sqlpool from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/sqlpool?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get workspace from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/workspace?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get mdpsparkpool from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Wait1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/mdpsparkpool?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Failure Message Check",
+				"description": "checks for any failures and returns details if any have been found",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "0_AcceleratorControl",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetFailureMessageFromBatchRun]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "01:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@concat(activity('Get mdpserver from Azure Key Vault').output.value,'.database.windows.net')",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@activity('Get mdpdb from Azure Key Vault').output.value",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "If No Failure",
+				"description": "If failure is found then call notification pipeline",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Failure Message Check",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@contains(activity('Failure Message Check').output,'firstRow')",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Execute Email Notification",
+							"description": "Call the email notification pipeline",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "EmailNotification",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"pipelineName": {
+										"value": "@activity('Failure Message Check').output.firstRow.PipelineName",
+										"type": "Expression"
+									},
+									"RunId": {
+										"value": "@activity('Failure Message Check').output.firstRow.BatchRunId",
+										"type": "Expression"
+									},
+									"batchgroupid": {
+										"value": "@pipeline().parameters.BatchGroupId",
+										"type": "Expression"
+									},
+									"feedkey": "-1",
+									"activityname": "N/A",
+									"KeyVault": {
+										"value": "@pipeline().parameters.KeyVault",
+										"type": "Expression"
+									},
+									"Status": "Failure",
+									"errormessage": {
+										"value": "@activity('Failure Message Check').output.firstRow.FailureMessage",
+										"type": "Expression"
+									},
+									"recipient": {
+										"value": "@activity('Failure Message Check').output.firstRow.Recipient",
+										"type": "Expression"
+									},
+									"domain": {
+										"value": "@activity('Failure Message Check').output.firstRow.Domain",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"KeyVault": {
+				"type": "string",
+				"defaultValue": "sndffcinfkv4401"
+			},
+			"BatchGroupId": {
+				"type": "string",
+				"defaultValue": "99"
+			},
+			"RunMode": {
+				"type": "string",
+				"defaultValue": "3"
+			},
+			"SkipDiscovery": {
+				"type": "string",
+				"defaultValue": "0"
+			}
+		},
+		"folder": {
+			"name": "MDPStart"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T20:24:26Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

@@ -1,0 +1,343 @@
+{
+	"name": "1f_GetFlatFileSourceSchema_CSV",
+	"properties": {
+		"description": "Get Run Metadata from Source \n\nlast change tjf 2020DEC01 10:00",
+		"activities": [
+			{
+				"name": "SourceSchema Merge",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "01 PreProcess CSV",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[temp].[transform_TempSourceSchema]",
+					"storedProcedureParameters": {
+						"BatchGroupId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchGroupId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"BatchRunId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchRunId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp_Azure",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "01 PreProcess CSV",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "1_1 Create Source Schema Temp Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "01_PreProcess_CSV",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"BatchGroupID": {
+							"value": "@pipeline().parameters.BatchGroupId",
+							"type": "Expression"
+						},
+						"BatchRunID": {
+							"value": "@pipeline().parameters.BatchRunId",
+							"type": "Expression"
+						},
+						"BatchProcessLogID": {
+							"value": "@pipeline().parameters.BatchProcessLogId",
+							"type": "Expression"
+						},
+						"mdpsparkpool": {
+							"value": "@pipeline().parameters.mdpsparkpool",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "1_1 Create Source Schema Temp Table",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get Number of Feeds",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "1_1_SourceSchemaTempCreate",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": false,
+					"parameters": {
+						"mdpdb": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						},
+						"mdpserver": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"BatchGroupID": {
+							"value": "@pipeline().parameters.BatchGroupId",
+							"type": "Expression"
+						},
+						"BatchRunID": {
+							"value": "@pipeline().parameters.BatchRunId",
+							"type": "Expression"
+						},
+						"BatchProcessLogID": {
+							"value": "@pipeline().parameters.BatchProcessLogId",
+							"type": "Expression"
+						},
+						"Feeds": {
+							"value": "@int(activity('Get Number of Feeds').output.firstRow.Feeds)",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Update_Fetch SourceSchema TempTable State",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "SourceSchema Merge",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "UPDATE [temp].[SourceSchemaBuilderControl]\nSET [state] = 2\nWHERE [state] = 0\nAND [BatchRunID] = '@{pipeline().parameters.BatchRunId}'\nAND [BatchGroupID] = '@{pipeline().parameters.BatchGroupId}'\n\nSELECT [state] \nFROM [temp].[SourceSchemaBuilderControl]\nWHERE [BatchRunID] = '@{pipeline().parameters.BatchRunId}'\nAND [BatchGroupID] = '@{pipeline().parameters.BatchGroupId}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set BatchProcess Close Error",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Update_Fetch SourceSchema TempTable State",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+					"storedProcedureParameters": {
+						"BatchProcessLogId": {
+							"value": {
+								"value": "@pipeline().parameters.BatchProcessLogId",
+								"type": "Expression"
+							},
+							"type": "Int32"
+						},
+						"ErrorMessage": {
+							"value": {
+								"value": "@activity('Update_Fetch SourceSchema TempTable State').Error.Message",
+								"type": "Expression"
+							},
+							"type": "String"
+						},
+						"SuccessFlag": {
+							"value": "0",
+							"type": "Int32"
+						},
+						"ErrorObject": {
+							"value": "01b Update and Fetch TempTable State",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "lsMDPapp_Azure",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"server": {
+							"value": "@pipeline().parameters.mdpserver",
+							"type": "Expression"
+						},
+						"dbname": {
+							"value": "@pipeline().parameters.mdpdb",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get Number of Feeds",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT COALESCE(COUNT(*),1) AS Feeds\nFROM app.Feed\nWHERE BatchGroupID = @{pipeline().parameters.BatchGroupId}\nAND IsEnabled = 1",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 1
+			},
+			"BatchRunId": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"BatchProcessLogId": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "lbs-sql-mdp-dev.database.windows.net"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "lbs-sqldb-mdp-dev"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"mdpsparkpool": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"ProcessStream": {
+				"type": "String",
+				"defaultValue": "DSC2APP1"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [
+			"standard load eg CE"
+		],
+		"lastPublishTime": "2021-07-31T20:21:13Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

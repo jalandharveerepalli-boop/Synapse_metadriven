@@ -1,0 +1,362 @@
+{
+	"name": "5b_RefreshPBIDataset",
+	"properties": {
+		"activities": [
+			{
+				"name": "Call the Dataset Refresh",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get Back the Authorisation Token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://api.powerbi.com/v1.0/myorg/groups/'\n,pipeline().parameters.PBIAppWorkspaceId\n,'/datasets/'\n,pipeline().parameters.PBIDatasetId\n,'/refreshes')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "POST",
+					"headers": {
+						"Authorization": {
+							"value": "@concat(string(activity('Get Back the Authorisation Token').output.token_type),' ',string(activity('Get Back the Authorisation Token').output.access_token))",
+							"type": "Expression"
+						}
+					},
+					"body": {
+						"helloww": "worldddd"
+					}
+				}
+			},
+			{
+				"name": "Get Back the Authorisation Token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get Secret from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get TenantId from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get ClientId from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://login.microsoftonline.com/',activity('Get TenantId from Azure Key Vault').output.value,'/oauth2/token')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					"body": {
+						"value": "@concat('grant_type=client_credentials&resource=https://analysis.windows.net/powerbi/api&client_id=',activity('Get ClientId from Azure Key Vault').output.value,'&client_secret=',encodeUriComponent(activity('Get Secret from Azure Key Vault').output.value))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get TenantId from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().parameters.KeyVaultDNSName,'secrets/',pipeline().parameters.SecretName_TenantId,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get ClientId from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().parameters.KeyVaultDNSName,'secrets/',pipeline().parameters.SecretName_SPClientId,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get Secret from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat(pipeline().parameters.KeyVaultDNSName,'secrets/',pipeline().parameters.SecretName_SPSecret,'?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Wait Until the Refresh Finishes",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "Call the Dataset Refresh",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greaterOrEquals(indexOf(variables('APIResponse'), 'Completed'), 0)",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Ask the API If the Refresh is Running",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Refresh the Token",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@concat('https://api.powerbi.com/v1.0/myorg/groups/'\n,pipeline().parameters.PBIAppWorkspaceId\n,'/datasets/'\n,pipeline().parameters.PBIDatasetId\n,'/refreshes?$top=1')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "GET",
+								"headers": {
+									"Authorization": {
+										"value": "@concat(string(activity('Get Back the Authorisation Token').output.token_type),' ',string(activity('Get Back the Authorisation Token').output.access_token))",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Wait 1 Minute",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 60
+							}
+						},
+						{
+							"name": "Store the Response",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Ask the API If the Refresh is Running",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "APIResponse",
+								"value": {
+									"value": "@string(activity('Ask the API If the Refresh is Running').output.value)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Refresh the Token",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Wait 1 Minute",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": true,
+								"secureInput": true
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@concat('https://login.microsoftonline.com/',activity('Get TenantId from Azure Key Vault').output.value,'/oauth2/token')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "POST",
+								"headers": {
+									"Content-Type": "application/x-www-form-urlencoded"
+								},
+								"body": {
+									"value": "@concat('grant_type=client_credentials&resource=https://analysis.windows.net/powerbi/api&client_id=',activity('Get ClientId from Azure Key Vault').output.value,'&client_secret=',encodeUriComponent(activity('Get Secret from Azure Key Vault').output.value))",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"timeout": "0.00:30:00"
+				}
+			}
+		],
+		"parameters": {
+			"SecretName_TenantId": {
+				"type": "string",
+				"defaultValue": "pbiappregtenantid"
+			},
+			"SecretName_SPClientId": {
+				"type": "string",
+				"defaultValue": "pbiappregclientid"
+			},
+			"SecretName_SPSecret": {
+				"type": "string",
+				"defaultValue": "pbiappregclientsecret"
+			},
+			"PBIAppWorkspaceId": {
+				"type": "string"
+			},
+			"PBIDatasetId": {
+				"type": "string"
+			},
+			"BatchGroupId": {
+				"type": "int"
+			},
+			"BatchRunId": {
+				"type": "int"
+			},
+			"RunMode": {
+				"type": "int"
+			},
+			"KeyVaultDNSName": {
+				"type": "string"
+			},
+			"TriggerId": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"APIResponse": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [],
+		"lastPublishTime": "2022-02-09T11:43:44Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

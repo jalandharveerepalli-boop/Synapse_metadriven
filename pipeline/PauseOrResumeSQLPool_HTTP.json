@@ -1,0 +1,324 @@
+{
+	"name": "PauseOrResumeSQLPool_HTTP",
+	"properties": {
+		"activities": [
+			{
+				"name": "Switch1",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "Get resumesqlpool from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get suspendsqlpool from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.PauseOrResume",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "Pause",
+							"activities": [
+								{
+									"name": "Pause Synapse",
+									"description": "Pause Synapse Webhook",
+									"type": "WebHook",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@activity('Get suspendsqlpool from Azure Key Vault').output.value",
+											"type": "Expression"
+										},
+										"method": "POST",
+										"headers": {
+											"Content-Type": "application/json"
+										},
+										"body": {
+											"value": "@json(\nconcat('{\n\"SynapseSqlPool\":\"',activity('Get sqlpool from Azure Key Vault').output.value,'\",',\n'\"resourceGroupName\":\"',activity('Get RG from Azure Key Vault').output.value,'\",',\n'\"SynapseWorkspaceName\":\"',activity('Get workspace from Azure Key Vault').output.value,'\",',\n'\"subscription\":\"',activity('Get SubId from Azure Key Vault').output.value,'\"\n}'\n))",
+											"type": "Expression"
+										},
+										"timeout": "00:10:00"
+									}
+								}
+							]
+						},
+						{
+							"value": "Resume",
+							"activities": [
+								{
+									"name": "Start Synapse",
+									"description": "Start Synapse Webhook",
+									"type": "WebHook",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@activity('Get resumesqlpool from Azure Key Vault').output.value",
+											"type": "Expression"
+										},
+										"method": "POST",
+										"body": {
+											"value": "@json(\nconcat('{\n\"SynapseSqlPool\":\"',activity('Get sqlpool from Azure Key Vault').output.value,'\",',\n'\"resourceGroupName\":\"',activity('Get RG from Azure Key Vault').output.value,'\",',\n'\"SynapseWorkspaceName\":\"',activity('Get workspace from Azure Key Vault').output.value,'\",',\n'\"subscription\":\"',activity('Get SubId from Azure Key Vault').output.value,'\"\n}'\n))",
+											"type": "Expression"
+										},
+										"timeout": "00:10:00"
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Wait1",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get suspendsqlpool from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get workspace from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/suspendsqlpool?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get resumesqlpool from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get sqlpool from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/resumesqlpool?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get SubId from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/subid?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get RG from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/resourcegroup?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get sqlpool from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get RG from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/sqlpool?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get workspace from Azure Key Vault",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get SubId from Azure Key Vault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://',pipeline().parameters.KeyVault,'.vault.azure.net/secrets/workspace?api-version=7.0')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"body": {
+						"simple": "body"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"PauseOrResume": {
+				"type": "string",
+				"defaultValue": "Resume"
+			},
+			"keyvault": {
+				"type": "string",
+				"defaultValue": "devmdpkv1003"
+			}
+		},
+		"folder": {
+			"name": "MDPUtil"
+		},
+		"annotations": []
+	}
+}

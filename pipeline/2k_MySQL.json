@@ -1,0 +1,550 @@
+{
+	"name": "2k_MySQL",
+	"properties": {
+		"description": "[Process Stream Code = SRC2ADLS]",
+		"activities": [
+			{
+				"name": "GetTableList",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetExtractBatchSettings]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Extract Build Schemas",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetTableList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetTableList').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Switch",
+							"type": "Switch",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"on": {
+									"value": "@Item().Collation",
+									"type": "Expression"
+								},
+								"cases": [
+									{
+										"value": "AzureMySQL",
+										"activities": [
+											{
+												"name": "ExecuteAzureMySQL",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2k1_LoadToADLS_AzureMySQL",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@pipeline().parameters.ExternalFeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@pipeline().parameters.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@pipeline().parameters.WorkingFileName",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@pipeline().parameters.WorkingFilePathName",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@pipeline().parameters.ExternalFileName",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@pipeline().parameters.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@pipeline().parameters.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@pipeline().parameters.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@pipeline().parameters.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@pipeline().parameters.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@pipeline().parameters.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@pipeline().parameters.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@pipeline().parameters.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@pipeline().parameters.WorkingColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@pipeline().parameters.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@pipeline().parameters.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@pipeline().parameters.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@pipeline().parameters.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@pipeline().parameters.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@pipeline().parameters.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@pipeline().parameters.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@pipeline().parameters.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@pipeline().parameters.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@pipeline().parameters.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@pipeline().parameters.BatchProcessLogId",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"sourceuser": {
+															"value": "@pipeline().parameters.sourceuser",
+															"type": "Expression"
+														},
+														"sourcesecret": {
+															"value": "@pipeline().parameters.sourcesecret",
+															"type": "Expression"
+														},
+														"sourceport": {
+															"value": "@item().FriendlyServerName",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									},
+									{
+										"value": "MySQL",
+										"activities": [
+											{
+												"name": "ExecuteMySQL",
+												"type": "ExecutePipeline",
+												"dependsOn": [],
+												"userProperties": [],
+												"typeProperties": {
+													"pipeline": {
+														"referenceName": "2k2_LoadToADLS_MySQL",
+														"type": "PipelineReference"
+													},
+													"waitOnCompletion": true,
+													"parameters": {
+														"ExternalFeedKey": {
+															"value": "@pipeline().parameters.ExternalFeedKey",
+															"type": "Expression"
+														},
+														"FeedCDCType": {
+															"value": "@pipeline().parameters.FeedCDCType",
+															"type": "Expression"
+														},
+														"WorkingFileName": {
+															"value": "@pipeline().parameters.WorkingFileName",
+															"type": "Expression"
+														},
+														"WorkingFilePathName": {
+															"value": "@pipeline().parameters.WorkingFilePathName",
+															"type": "Expression"
+														},
+														"ExternalFileName": {
+															"value": "@pipeline().parameters.ExternalFileName",
+															"type": "Expression"
+														},
+														"LastRecordId": {
+															"value": "@pipeline().parameters.LastRecordId",
+															"type": "Expression"
+														},
+														"RecordIdColumnName": {
+															"value": "@pipeline().parameters.RecordIdColumnName",
+															"type": "Expression"
+														},
+														"CreateTimestampColumnName": {
+															"value": "@pipeline().parameters.CreateTimestampColumnName",
+															"type": "Expression"
+														},
+														"DeltaReverseTimeOffsetInSecs": {
+															"value": "@pipeline().parameters.DeltaReverseTimeOffsetInSecs",
+															"type": "Expression"
+														},
+														"LastSeenCreateTimestamp": {
+															"value": "@pipeline().parameters.LastSeenCreateTimestamp",
+															"type": "Expression"
+														},
+														"EditTimestampColumnName": {
+															"value": "@pipeline().parameters.EditTimestampColumnName",
+															"type": "Expression"
+														},
+														"LastSeenEditTimestamp": {
+															"value": "@pipeline().parameters.LastSeenEditTimestamp",
+															"type": "Expression"
+														},
+														"CustomCDCQuery": {
+															"value": "@pipeline().parameters.CustomCDCQuery",
+															"type": "Expression"
+														},
+														"WorkingColumnArray": {
+															"value": "@pipeline().parameters.WorkingColumnArray",
+															"type": "Expression"
+														},
+														"Container": {
+															"value": "@pipeline().parameters.Container",
+															"type": "Expression"
+														},
+														"BatchSchema": {
+															"value": "@pipeline().parameters.BatchSchema",
+															"type": "Expression"
+														},
+														"StorageURI": {
+															"value": "@pipeline().parameters.StorageURI",
+															"type": "Expression"
+														},
+														"SourceTable": {
+															"value": "@pipeline().parameters.SourceTable",
+															"type": "Expression"
+														},
+														"FileFormat": {
+															"value": "@pipeline().parameters.FileFormat",
+															"type": "Expression"
+														},
+														"BatchRunId": {
+															"value": "@pipeline().parameters.BatchRunId",
+															"type": "Expression"
+														},
+														"DatabaseName": {
+															"value": "@pipeline().parameters.DatabaseName",
+															"type": "Expression"
+														},
+														"ServerName": {
+															"value": "@pipeline().parameters.ServerName",
+															"type": "Expression"
+														},
+														"BatchGroupId": {
+															"value": "@pipeline().parameters.BatchGroupId",
+															"type": "Expression"
+														},
+														"CreateKeyFile": {
+															"value": "@pipeline().parameters.CreateKeyFile",
+															"type": "Expression"
+														},
+														"FeedFullyQualifiedADLSKeyPath": {
+															"value": "@pipeline().parameters.FeedFullyQualifiedADLSKeyPath",
+															"type": "Expression"
+														},
+														"KeyFileName": {
+															"value": "@pipeline().parameters.KeyFileName",
+															"type": "Expression"
+														},
+														"KeySelectStatement": {
+															"value": "@pipeline().parameters.KeySelectStatement",
+															"type": "Expression"
+														},
+														"BatchProcessLogId": {
+															"value": "@pipeline().parameters.BatchProcessLogId",
+															"type": "Expression"
+														},
+														"mdpdb": {
+															"value": "@pipeline().parameters.mdpdb",
+															"type": "Expression"
+														},
+														"mdpserver": {
+															"value": "@pipeline().parameters.mdpserver",
+															"type": "Expression"
+														},
+														"keyvaultdnsname": {
+															"value": "@pipeline().parameters.keyvaultdnsname",
+															"type": "Expression"
+														},
+														"sourceuser": {
+															"value": "@pipeline().parameters.sourceuser",
+															"type": "Expression"
+														},
+														"sourcesecret": {
+															"value": "@pipeline().parameters.sourcesecret",
+															"type": "Expression"
+														},
+														"sourceport": {
+															"value": "@item().FriendlyServerName",
+															"type": "Expression"
+														}
+													}
+												}
+											}
+										]
+									}
+								],
+								"defaultActivities": [
+									{
+										"name": "Wait1",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitTimeInSeconds": 1
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"ExternalFeedKey": {
+				"type": "string",
+				"defaultValue": "10050"
+			},
+			"FeedCDCType": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"WorkingFileName": {
+				"type": "string",
+				"defaultValue": "ce_knowledgearticle_20201127_084619.parquet"
+			},
+			"WorkingFilePathName": {
+				"type": "string",
+				"defaultValue": "raw/ce/knowledgearticle/2020-11-27/08-46-19"
+			},
+			"ExternalFileName": {
+				"type": "string",
+				"defaultValue": "ext.ce_knowledgearticle"
+			},
+			"LastRecordId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"RecordIdColumnName": {
+				"type": "string",
+				"defaultValue": "RECID"
+			},
+			"CreateTimestampColumnName": {
+				"type": "string",
+				"defaultValue": "SinkCreatedOn"
+			},
+			"DeltaReverseTimeOffsetInSecs": {
+				"type": "string",
+				"defaultValue": "60"
+			},
+			"LastSeenCreateTimestamp": {
+				"type": "string",
+				"defaultValue": "1900-01-01 00:01:01.000"
+			},
+			"EditTimestampColumnName": {
+				"type": "string",
+				"defaultValue": "LastModifiedTimeStamp"
+			},
+			"LastSeenEditTimestamp": {
+				"type": "string",
+				"defaultValue": "1900-01-01 00:01:01.000"
+			},
+			"CustomCDCQuery": {
+				"type": "string"
+			},
+			"WorkingColumnArray": {
+				"type": "string",
+				"defaultValue": "'articlepublicnumber','content','createdby','createdby_entitytype','createdbyname','createdbyyominame','createdon','createdonbehalfby','createdonbehalfby_entitytype','createdonbehalfbyname','createdonbehalfbyyominame','description','exchangerate','expirationdate','expirationstateid','expirationstatusid','expiredreviewoptions','Id','importsequencenumber','isinternal','islatestversion','isprimary','isrootarticle','keywords','knowledgearticleid','knowledgearticleviews','knowledgearticleviews_date','knowledgearticleviews_state','languagelocaleid','languagelocaleid_entitytype','languagelocaleidlocaleid','languagelocaleidname','majorversionnumber','minorversionnumber','modifiedby','modifiedby_entitytype','modifiedbyname','modifiedbyyominame','modifiedon','modifiedonbehalfby','modifiedonbehalfby_entitytype','modifiedonbehalfbyname','modifiedonbehalfbyyominame','overriddencreatedon','ownerid','ownerid_entitytype','owneridname','owneridtype','owneridyominame','owningbusinessunit','owningbusinessunit_entitytype','owningteam','owningteam_entitytype','owninguser','owninguser_entitytype','parentarticlecontentid','parentarticlecontentid_entitytype','parentarticlecontentidname','previousarticlecontentid','previousarticlecontentid_entitytype','previousarticlecontentidname','primaryauthorid','primaryauthorid_entitytype','primaryauthoridname','processid','publishon','publishstatusid','rating','rating_count','rating_date','rating_state','rating_sum','readyforreview','review','rootarticleid','rootarticleid_entitytype','rootarticleidname','scheduledstatusid','setcategoryassociations','setproductassociations','SinkCreatedOn','SinkModifiedOn','stageid','statecode','statuscode','subjectid','subjectid_entitytype','subjectiddsc','subjectidname','timezoneruleversionnumber','title','transactioncurrencyid','transactioncurrencyid_entitytype','transactioncurrencyidname','traversedpath','updatecontent','utcconversiontimezonecode','versionnumber'"
+			},
+			"Container": {
+				"type": "string",
+				"defaultValue": "d365"
+			},
+			"BatchSchema": {
+				"type": "string",
+				"defaultValue": "dbo"
+			},
+			"StorageURI": {
+				"type": "string",
+				"defaultValue": "https://edpdevrtkdls002.dfs.core.windows.net"
+			},
+			"SourceTable": {
+				"type": "string",
+				"defaultValue": "knowledgearticle"
+			},
+			"FileFormat": {
+				"type": "string",
+				"defaultValue": "parquet"
+			},
+			"BatchRunId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"DatabaseName": {
+				"type": "string",
+				"defaultValue": "ce-entitystore-dev-sqldb"
+			},
+			"ServerName": {
+				"type": "string",
+				"defaultValue": "ce-devtest-rtksql-001.database.windows.net"
+			},
+			"BatchGroupId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"CreateKeyFile": {
+				"type": "string",
+				"defaultValue": "0"
+			},
+			"FeedFullyQualifiedADLSKeyPath": {
+				"type": "string"
+			},
+			"KeyFileName": {
+				"type": "string"
+			},
+			"KeySelectStatement": {
+				"type": "string"
+			},
+			"BatchProcessLogId": {
+				"type": "int",
+				"defaultValue": 0
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			},
+			"sourceuser": {
+				"type": "string"
+			},
+			"sourcesecret": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"RowsToADLS": {
+				"type": "String",
+				"defaultValue": "999"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T20:02:27Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

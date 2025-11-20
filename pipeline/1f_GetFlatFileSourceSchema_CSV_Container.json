@@ -1,0 +1,651 @@
+{
+	"name": "1f_GetFlatFileSourceSchema_CSV_Container",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetTableList",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetExtractFeedList]",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"type": "Int32",
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Extract Build Schemas",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GetContainerList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GetContainerList').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "GetFlatFileSourceSchemaCSVFile",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "ResetTableSchema",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "1f1_GetFlatFileSourceSchema_CSV_File",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"BatchGroupId": {
+										"value": "@pipeline().parameters.BatchGroupId",
+										"type": "Expression"
+									},
+									"BatchRunId": {
+										"value": "@pipeline().parameters.BatchRunId",
+										"type": "Expression"
+									},
+									"BatchProcessLogId": {
+										"value": "@pipeline().parameters.BatchProcessLogId",
+										"type": "Expression"
+									},
+									"mdpdb": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									},
+									"mdpserver": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"keyvaultdnsname": {
+										"value": "@pipeline().parameters.keyvaultdnsname",
+										"type": "Expression"
+									},
+									"storageuri": {
+										"value": "@concat('https://',activity('GetTableList').output.value[0].ServerName,'.dfs.core.windows.net')",
+										"type": "Expression"
+									},
+									"container": {
+										"value": "@activity('GetTableList').output.value[0].DBName",
+										"type": "Expression"
+									},
+									"folder": {
+										"value": "@activity('GetTableList').output.value[0].Domain",
+										"type": "Expression"
+									},
+									"file": {
+										"value": "@item().name",
+										"type": "Expression"
+									},
+									"headerskiplines": {
+										"value": "@activity('GetTableList').output.value[0].CSVSkipLinesHeader",
+										"type": "Expression"
+									},
+									"datatypeskiplines": {
+										"value": "@activity('GetTableList').output.value[0].CSVSkipLinesDataTypes",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "ResetTableSchema",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[ResetTempSourceSchemaColumns]"
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Wait3",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "SourceSchema Merge",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						},
+						{
+							"name": "Set BatchProcess Close Error9",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Build Staging Schema",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[app].[SetBatchProcessLogClose]",
+								"storedProcedureParameters": {
+									"BatchProcessLogId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchProcessLogId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"ErrorMessage": {
+										"value": {
+											"value": "@activity('Build Staging Schema').Error.Message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SuccessFlag": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"ErrorObject": {
+										"value": "1c Build Staging Schema",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Build Staging Schema",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "GetFlatFileSourceSchemaCSVFile",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"additionalColumns": [
+										{
+											"name": "DataFactoryName",
+											"value": {
+												"value": "@pipeline().DataFactory",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "PipelineName",
+											"value": {
+												"value": "@pipeline().Pipeline",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "PipelineRunId",
+											"value": {
+												"value": "@pipeline().RunId",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "BatchRunId",
+											"value": {
+												"value": "@pipeline().parameters.BatchRunId",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "BatchGroupId",
+											"value": {
+												"value": "@string(pipeline().parameters.BatchGroupId)",
+												"type": "Expression"
+											}
+										}
+									],
+									"sqlReaderQuery": {
+										"value": "DECLARE @SourceName NVARCHAR(255)\n,@SourceSchema  NVARCHAR(255)\n,@Domain NVARCHAR(255)\n,@Subject  NVARCHAR(255)\n,@FeedKey  INT\n\nSELECT \n@SourceName = '@{item().name}'\n,@SourceSchema = '@{activity('GetTableList').output.value[0].Domain}' \n,@Domain = '@{activity('GetTableList').output.value[0].Domain}' \n,@Subject = REPLACE('@{item().name}','.csv','')\n,@FeedKey = @{activity('GetTableList').output.value[0].FeedKey}\n\nSELECT \n@FeedKey  AS FeedKey\n,@Subject AS TableName\n,@SourceSchema AS SchemaName\n,ssc.SourceColumnId AS FieldPosition\n,0 AS ScriptHeader\n,'[' + ssc.SourceColumn +'] ['+ ssc.SourceDataType +'] NULL '  AS FieldCreateSQL\n,ssc.SourceColumn AS FieldName\n,ssc.SourceColumn AS FieldWarehouseName --for WarehouseMapping\n,'['+ ssc.SourceDataType +']' AS FieldDataType\n,0 AS PrimaryKeyCol \n\n,'csv' AS SourceSchemaType\n\nFROM temp.SourceSchemaColumns AS ssc\nWHERE ssc.SourceTable = @Subject \nORDER BY cast(ssc.SourceColumnId as int)",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"disableMetricsCollection": false,
+									"writeBehavior": "insert"
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "TableName"
+											},
+											"sink": {
+												"name": "TableName",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "SchemaName"
+											},
+											"sink": {
+												"name": "SchemaName",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "ScriptHeader"
+											},
+											"sink": {
+												"name": "ScriptHeader",
+												"type": "Boolean"
+											}
+										},
+										{
+											"source": {
+												"name": "FieldPosition"
+											},
+											"sink": {
+												"name": "FieldPosition",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "FieldName"
+											},
+											"sink": {
+												"name": "FieldName",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "FieldDataType"
+											},
+											"sink": {
+												"name": "FieldDataType",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "FieldCreateSQL"
+											},
+											"sink": {
+												"name": "FieldCreateSQL",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "PrimaryKeyCol"
+											},
+											"sink": {
+												"name": "FieldPrimaryKey"
+											}
+										},
+										{
+											"source": {
+												"name": "DataFactoryName"
+											},
+											"sink": {
+												"name": "DataFactoryName"
+											}
+										},
+										{
+											"source": {
+												"name": "SourceSchemaType"
+											},
+											"sink": {
+												"name": "SourceSchemaType",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"name": "PipelineName"
+											},
+											"sink": {
+												"name": "PipelineName"
+											}
+										},
+										{
+											"source": {
+												"name": "PipelineRunId"
+											},
+											"sink": {
+												"name": "PipelineRunId"
+											}
+										},
+										{
+											"source": {
+												"name": "FieldWarehouseName"
+											},
+											"sink": {
+												"name": "FieldWarehouseName"
+											}
+										},
+										{
+											"source": {
+												"name": "BatchGroupId"
+											},
+											"sink": {
+												"name": "BatchGroupId"
+											}
+										},
+										{
+											"source": {
+												"name": "BatchRunId"
+											},
+											"sink": {
+												"name": "BatchRunId"
+											}
+										},
+										{
+											"source": {
+												"name": "FeedKey"
+											},
+											"sink": {
+												"name": "FeedKey"
+											}
+										}
+									]
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "dsTableSchema",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "SourceSchema Merge",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Wait2",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[transform].[SourceSchema]",
+								"storedProcedureParameters": {
+									"BatchGroupId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchGroupId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"BatchRunId": {
+										"value": {
+											"value": "@pipeline().parameters.BatchRunId",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "lsMDPapp",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"server": {
+										"value": "@pipeline().parameters.mdpserver",
+										"type": "Expression"
+									},
+									"dbname": {
+										"value": "@pipeline().parameters.mdpdb",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [
+								{
+									"activity": "Build Staging Schema",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "GetContainerList",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "GetTableList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "dsADLSfolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"blobfolder": {
+								"value": "@activity('GetTableList').output.value[0].Domain",
+								"type": "Expression"
+							},
+							"blobcontainer": {
+								"value": "@activity('GetTableList').output.value[0].DBName",
+								"type": "Expression"
+							},
+							"storageuri": {
+								"value": "@concat('https://',activity('GetTableList').output.value[0].ServerName,'.dfs.core.windows.net')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"BatchGroupId": {
+				"type": "int",
+				"defaultValue": 3
+			},
+			"BatchRunId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"BatchProcessLogId": {
+				"type": "string",
+				"defaultValue": "1"
+			},
+			"mdpdb": {
+				"type": "string",
+				"defaultValue": "hapmdpappdbdev"
+			},
+			"mdpserver": {
+				"type": "string",
+				"defaultValue": "hapsqlserverdev.database.windows.net"
+			},
+			"keyvaultdnsname": {
+				"type": "string",
+				"defaultValue": "hapkeyvaultdev"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,175 @@
+{
+	"name": "6a_LookupFailureMessages",
+	"properties": {
+		"activities": [
+			{
+				"name": "Lookup Failure Messages",
+				"description": "exec [app].[GetFailureMessageFromBatch]",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[app].[GetFailureMessageFromBatch]",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "ForEachFailureMessage",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup Failure Messages",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@split(activity('Lookup Failure Messages').output.firstrow.FailureMessage, ',')",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Notify Failure Batch Msg",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "LookupMetadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@variables('TeamsWebhook')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "SHIR",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "POST",
+								"body": {
+									"value": "{\"@@context\":\"http://schema.org/extensions\",\"@@type\":\"MessageCard\"\n,\"sections\":[{\"activityImage\":\"https://assets.us.ovhcloud.com/sites/default/files/medias/images/why/cert_HDS.jpg\"\n,\"activityText\":\"@{activity('LookupMetadata').output.firstrow.FailureMessage}\"\n,\"activityTitle\":\"Recent failures have occurred on the following: \"}]\n,\"summary\":\"test\",\"themeColor\":\"#FF0000\"}",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "LookupMetadata",
+							"description": "exec [app].[SetFailureMessageMetadata]",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[app].[SetFailureMessageMetadata]",
+									"storedProcedureParameters": {
+										"FailureMessage": {
+											"type": "String",
+											"value": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "dsMDP",
+									"type": "DatasetReference",
+									"parameters": {
+										"server": {
+											"value": "@pipeline().parameters.mdpserver",
+											"type": "Expression"
+										},
+										"db": {
+											"value": "@pipeline().parameters.mdpdb",
+											"type": "Expression"
+										},
+										"schema": "dbo",
+										"table": "Dummy"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"mdpdb": {
+				"type": "string"
+			},
+			"mdpserver": {
+				"type": "string"
+			},
+			"keyvaultdnsname": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"FailureMessages": {
+				"type": "String"
+			},
+			"TeamsWebhook": {
+				"type": "String",
+				"defaultValue": "https://spectronservices.webhook.office.com/webhookb2/b720b648-3373-48eb-8056-a8abc355dc80@44ec288a-3cd7-40fd-aa96-199e240b94ce/IncomingWebhook/caa45c79ee6c49edab54f4a594120924/e2540cf1-fbcf-4ef5-b280-21ebb8bf5f8b"
+			}
+		},
+		"folder": {
+			"name": "MDPchild"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-07-31T18:51:26Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}

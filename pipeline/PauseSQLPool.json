@@ -1,0 +1,142 @@
+{
+	"name": "PauseSQLPool",
+	"properties": {
+		"description": "based on batches running overnight - do i pause or not ",
+		"activities": [
+			{
+				"name": "LookupBatchGroupIdDecision",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "app.GetBatchGroupIdSQLPoolDecision",
+						"storedProcedureParameters": {
+							"BatchGroupId": {
+								"value": {
+									"value": "@pipeline().parameters.BatchGroupId",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "dsMDP",
+						"type": "DatasetReference",
+						"parameters": {
+							"server": {
+								"value": "@pipeline().parameters.mdpserver",
+								"type": "Expression"
+							},
+							"db": {
+								"value": "@pipeline().parameters.mdpdb",
+								"type": "Expression"
+							},
+							"schema": "dbo",
+							"table": "Dummy"
+						}
+					}
+				}
+			},
+			{
+				"name": "Switch1",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "LookupBatchGroupIdDecision",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@activity('LookupBatchGroupIdDecision').output.firstrow.Decision",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "Yes",
+							"activities": [
+								{
+									"name": "PauseSQLPool",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "PauseOrResumeSQLPool_HTTP",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"PauseOrResume": "Pause",
+											"keyvault": {
+												"value": "@replace(replace(pipeline().parameters.Keyvault,'https://',''),'.vault.azure.net','')\n",
+												"type": "Expression"
+											}
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "No",
+							"activities": [
+								{
+									"name": "Wait1",
+									"type": "Wait",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"waitTimeInSeconds": 1
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Wait2",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"mdpserver": {
+				"type": "string"
+			},
+			"mdpdb": {
+				"type": "string"
+			},
+			"BatchGroupId": {
+				"type": "string"
+			},
+			"keyvault": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "MDPUtil"
+		},
+		"annotations": []
+	}
+}
