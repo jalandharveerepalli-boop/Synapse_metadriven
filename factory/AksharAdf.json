@@ -1,0 +1,9 @@
+{
+	"name": "AksharAdf",
+	"location": "francecentral",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "435a784c-0ae3-470c-a389-4b527cd016d0",
+		"tenantId": "7e445f9b-3d45-487d-9c09-1333ecd43070"
+	}
+}
