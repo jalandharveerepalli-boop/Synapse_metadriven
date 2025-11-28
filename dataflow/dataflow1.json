@@ -37,7 +37,7 @@
 				"     validateSchema: false,",
 				"     limit: 100,",
 				"     ignoreNoFilesFound: false,",
-				"     documentForm: 'arrayOfDocuments') ~> source1",
+				"     documentForm: 'documentPerLine') ~> source1",
 				"source1 foldDown(unroll(products, products),",
 				"     mapColumn(",
 				"          id = products.id,",
