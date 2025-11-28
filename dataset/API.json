@@ -5,6 +5,9 @@
 			"referenceName": "REstAPI",
 			"type": "LinkedServiceReference"
 		},
+		"folder": {
+			"name": "Learning_datasets"
+		},
 		"annotations": [],
 		"type": "RestResource",
 		"typeProperties": {
