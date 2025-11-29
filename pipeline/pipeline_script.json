@@ -1,0 +1,37 @@
+{
+	"name": "pipeline_script",
+	"properties": {
+		"activities": [
+			{
+				"name": "Script1",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AzureSqlDatabase1",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "NonQuery",
+							"text": "create table if not exists SalesLT.Airports(ID int, Name varchar(30));\n\nInsert into SalesLT.Airports values(1, 'London'),(2, 'Manchester'),(3, 'Leeds');\n\nselect * from SalesLT.Airports;"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"folder": {
+			"name": "Learning_adf"
+		},
+		"annotations": []
+	}
+}

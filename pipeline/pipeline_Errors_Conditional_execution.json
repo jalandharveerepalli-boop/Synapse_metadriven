@@ -1,0 +1,50 @@
+{
+	"name": "pipeline_Errors_Conditional_execution",
+	"properties": {
+		"activities": [
+			{
+				"name": "MyFailActivity",
+				"type": "Fail",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"message": "My Custom Error Message",
+					"errorCode": "500"
+				}
+			},
+			{
+				"name": "Set variable1",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "MyFailActivity",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "pipelineReturnValue",
+					"value": [
+						{
+							"key": "error",
+							"value": {
+								"type": "String"
+							}
+						}
+					],
+					"setSystemVariable": true
+				}
+			}
+		],
+		"folder": {
+			"name": "Learning_adf"
+		},
+		"annotations": []
+	}
+}

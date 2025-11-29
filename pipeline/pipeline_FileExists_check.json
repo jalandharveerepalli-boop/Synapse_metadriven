@@ -1,5 +1,5 @@
 {
-	"name": "pipeline1",
+	"name": "pipeline_FileExists_check",
 	"properties": {
 		"activities": [
 			{
@@ -65,7 +65,7 @@
 								"method": "POST",
 								"url": "https://prod-21.francecentral.logic.azure.com:443/workflows/7722a0ed64e644cca248b4c6f91c9406/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=jufEWTqhE-AYcmuXJWBguL4WTa4QLu_3QEjHj4kmULY",
 								"body": {
-									"value": "{\"message\":\"File not found\",\"expectedPath\":\"path/to/file\"}",
+									"value": "{\n    \"message\" : \"File not found from your pipeline with run ID @{pipeline().RunId}.\",\n    \"dataFactoryName\" : \"@{pipeline().DataFactory}\", \n    \"pipelineName\" : \"@{pipeline().Pipeline}\", \n    \"receiver\" : \"@{pipeline().parameters.receiver}\"\n   }",
 									"type": "Expression"
 								}
 							}
@@ -142,13 +142,22 @@
 							"typeProperties": {
 								"method": "POST",
 								"url": "https://prod-26.francecentral.logic.azure.com:443/workflows/f6abc03598f04dabbb8e4b1f50664901/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=sPKpnSc2IViYDVxEe8LmfpmbPJNsyuD0jSOUeQ40Gfs",
-								"body": "File copied successfully"
+								"body": {
+									"value": "{\n    \"message\" : \"This is a custom dynamic message from your pipeline with run ID @{pipeline().RunId}.\",\n    \"dataFactoryName\" : \"@{pipeline().DataFactory}\", \n    \"pipelineName\" : \"@{pipeline().Pipeline}\", \n    \"receiver\" : \"@{pipeline().parameters.receiver}\"\n   }",
+									"type": "Expression"
+								}
 							}
 						}
 					]
 				}
 			}
 		],
+		"parameters": {
+			"receiver": {
+				"type": "string",
+				"defaultValue": "jalandhar.veerepalli@gmail.com"
+			}
+		},
 		"folder": {
 			"name": "Learning_adf"
 		},
