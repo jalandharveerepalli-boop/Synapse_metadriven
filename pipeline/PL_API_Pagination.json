@@ -1,0 +1,28 @@
+{
+	"name": "PL_API_Pagination",
+	"properties": {
+		"activities": [
+			{
+				"name": "CallAPI_Page1",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://dummyjson.com/products?page=1"
+				}
+			}
+		],
+		"folder": {
+			"name": "Learning_adf"
+		},
+		"annotations": []
+	}
+}
