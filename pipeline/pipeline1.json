@@ -63,7 +63,7 @@
 							"userProperties": [],
 							"typeProperties": {
 								"method": "POST",
-								"url": "https://prod-19.northcentralus.logic.azure.com:443/workflows/10629b2982a4442e81fcc7b60c380372/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=RJrYyaH4qsj3SxFupdGnXEuC8F4kLCaMjJExJ5vykUI",
+								"url": "https://prod-21.francecentral.logic.azure.com:443/workflows/7722a0ed64e644cca248b4c6f91c9406/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=jufEWTqhE-AYcmuXJWBguL4WTa4QLu_3QEjHj4kmULY",
 								"body": {
 									"value": "{\"message\":\"File not found\",\"expectedPath\":\"path/to/file\"}",
 									"type": "Expression"
@@ -141,7 +141,7 @@
 							"userProperties": [],
 							"typeProperties": {
 								"method": "POST",
-								"url": "https://prod-05.northcentralus.logic.azure.com:443/workflows/c64241f2bd5141c1a47b121ab9303fc5/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=0sAQRVnTVWp8Cas1o20T0d2RZiT8kmy47vH4bJf4VFU",
+								"url": "https://prod-26.francecentral.logic.azure.com:443/workflows/f6abc03598f04dabbb8e4b1f50664901/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=sPKpnSc2IViYDVxEe8LmfpmbPJNsyuD0jSOUeQ40Gfs",
 								"body": "File copied successfully"
 							}
 						}
