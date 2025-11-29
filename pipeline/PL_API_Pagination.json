@@ -123,11 +123,6 @@
 				}
 			}
 		],
-		"parameters": {
-			"page": {
-				"type": "string"
-			}
-		},
 		"variables": {
 			"pageCount": {
 				"type": "Integer"
