@@ -16,7 +16,7 @@
 			"location": {
 				"type": "AzureBlobFSLocation",
 				"fileName": {
-					"value": "pages/page_@{pipeline().parameters.page}.json",
+					"value": "page_@{dataset().PageNumber}.json",
 					"type": "Expression"
 				},
 				"folderPath": "raw",
