@@ -5,6 +5,11 @@
 			"referenceName": "REST_API_json",
 			"type": "LinkedServiceReference"
 		},
+		"parameters": {
+			"PageNumber": {
+				"type": "string"
+			}
+		},
 		"annotations": [],
 		"type": "RestResource",
 		"typeProperties": {
