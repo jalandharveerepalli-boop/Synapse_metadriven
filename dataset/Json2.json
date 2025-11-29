@@ -1,0 +1,23 @@
+{
+	"name": "Json2",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ADLSGen2",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "pages/page_@{pipeline().parameters.page}.json",
+					"type": "Expression"
+				},
+				"folderPath": "raw",
+				"fileSystem": "sink"
+			}
+		},
+		"schema": {}
+	}
+}
