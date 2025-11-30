@@ -38,7 +38,7 @@
 				"typeProperties": {
 					"variableName": "pageCount",
 					"value": {
-						"value": "@activity('CallAPI_Page1').output.totalPages",
+						"value": "@activity('CallAPI_Page1').output.total",
 						"type": "Expression"
 					}
 				}
