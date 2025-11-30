@@ -77,12 +77,6 @@
 												"value": "@item().name",
 												"type": "Expression"
 											}
-										},
-										"MergeAllJsonOutput": {
-											"filePath": {
-												"value": "@item().name",
-												"type": "Expression"
-											}
 										}
 									}
 								},
