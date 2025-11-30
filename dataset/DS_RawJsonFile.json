@@ -1,16 +1,24 @@
 {
-	"name": "Json_pages",
+	"name": "DS_RawJsonFile",
 	"properties": {
 		"linkedServiceName": {
 			"referenceName": "ADLSGen2",
 			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"filePath": {
+				"type": "string"
+			}
 		},
 		"annotations": [],
 		"type": "Json",
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
-				"fileName": "page_*.json",
+				"fileName": {
+					"value": "@dataset().filePath",
+					"type": "Expression"
+				},
 				"folderPath": "raw",
 				"fileSystem": "sink"
 			}
