@@ -32,7 +32,7 @@
 				}
 			},
 			{
-				"name": "ForEach1",
+				"name": "Loop_json_files_from_blob",
 				"type": "ForEach",
 				"dependsOn": [
 					{
@@ -50,131 +50,125 @@
 					},
 					"activities": [
 						{
-							"name": "If Condition1",
-							"type": "IfCondition",
+							"name": "Load_json_files_db",
+							"type": "Copy",
 							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
 							"userProperties": [],
 							"typeProperties": {
-								"expression": {
-									"value": "@endswith(item().name, '.json')",
-									"type": "Expression"
+								"source": {
+									"type": "JsonSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": true,
+										"wildcardFolderPath": "raw",
+										"wildcardFileName": "*.json",
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "JsonReadSettings"
+									}
 								},
-								"ifTrueActivities": [
-									{
-										"name": "Copy data1",
-										"type": "Copy",
-										"dependsOn": [],
-										"policy": {
-											"timeout": "0.12:00:00",
-											"retry": 0,
-											"retryIntervalInSeconds": 30,
-											"secureOutput": false,
-											"secureInput": false
-										},
-										"userProperties": [],
-										"typeProperties": {
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "insert",
+									"sqlWriterUseTableLock": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
 											"source": {
-												"type": "JsonSource",
-												"storeSettings": {
-													"type": "AzureBlobFSReadSettings",
-													"recursive": true,
-													"enablePartitionDiscovery": false
-												},
-												"formatSettings": {
-													"type": "JsonReadSettings"
-												}
+												"path": "['id']"
 											},
 											"sink": {
-												"type": "AzureSqlSink",
-												"writeBehavior": "insert",
-												"sqlWriterUseTableLock": false
-											},
-											"enableStaging": false,
-											"translator": {
-												"type": "TabularTranslator",
-												"mappings": [
-													{
-														"source": {
-															"path": "['id']"
-														},
-														"sink": {
-															"name": "ProductID",
-															"type": "Int32"
-														}
-													},
-													{
-														"source": {
-															"path": "['title']"
-														},
-														"sink": {
-															"name": "Title",
-															"type": "String"
-														}
-													},
-													{
-														"source": {
-															"path": "['description']"
-														},
-														"sink": {
-															"name": "Description",
-															"type": "String"
-														}
-													},
-													{
-														"source": {
-															"path": "['category']"
-														},
-														"sink": {
-															"name": "Category",
-															"type": "String"
-														}
-													},
-													{
-														"source": {
-															"path": "['price']"
-														},
-														"sink": {
-															"name": "Price",
-															"type": "Decimal"
-														}
-													},
-													{
-														"source": {
-															"path": "['rating']"
-														},
-														"sink": {
-															"name": "Rating",
-															"type": "Decimal"
-														}
-													},
-													{
-														"source": {
-															"path": "['stock']"
-														},
-														"sink": {
-															"name": "Stock",
-															"type": "String"
-														}
-													}
-												],
-												"collectionReference": "$['products']"
+												"name": "ProductID",
+												"type": "Int32"
 											}
 										},
-										"inputs": [
-											{
-												"referenceName": "Json1",
-												"type": "DatasetReference"
+										{
+											"source": {
+												"path": "['title']"
+											},
+											"sink": {
+												"name": "Title",
+												"type": "String"
 											}
-										],
-										"outputs": [
-											{
-												"referenceName": "DS_SQLProducts",
-												"type": "DatasetReference"
+										},
+										{
+											"source": {
+												"path": "['description']"
+											},
+											"sink": {
+												"name": "Description",
+												"type": "String"
 											}
-										]
+										},
+										{
+											"source": {
+												"path": "['category']"
+											},
+											"sink": {
+												"name": "Category",
+												"type": "String"
+											}
+										},
+										{
+											"source": {
+												"path": "['price']"
+											},
+											"sink": {
+												"name": "Price",
+												"type": "Decimal"
+											}
+										},
+										{
+											"source": {
+												"path": "['rating']"
+											},
+											"sink": {
+												"name": "Rating",
+												"type": "Decimal"
+											}
+										},
+										{
+											"source": {
+												"path": "['stock']"
+											},
+											"sink": {
+												"name": "Stock",
+												"type": "String"
+											}
+										}
+									],
+									"collectionReference": "$['products']"
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "Json1",
+									"type": "DatasetReference",
+									"parameters": {
+										"fileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
 									}
-								]
-							}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_SQLProducts",
+									"type": "DatasetReference"
+								}
+							]
 						}
 					]
 				}
