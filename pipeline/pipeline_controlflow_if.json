@@ -1,9 +1,9 @@
 {
-	"name": "pipeline_controlflow",
+	"name": "pipeline_controlflow_if",
 	"properties": {
 		"activities": [
 			{
-				"name": "Set variable1",
+				"name": "Current Timestamp",
 				"type": "SetVariable",
 				"dependsOn": [],
 				"policy": {
@@ -12,18 +12,58 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"variableName": "strArray",
-					"value": [
-						"1",
-						"2",
-						"3"
+					"variableName": "current_timestamp",
+					"value": {
+						"value": "@adddays(utcNow(),-1)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "If Condition1",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Current Timestamp",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(0,dayOfWeek(variables('current_timestamp')))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "not sunday",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "sunday",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
 					]
 				}
 			}
 		],
 		"variables": {
-			"strArray": {
-				"type": "Array"
+			"current_timestamp": {
+				"type": "String"
 			}
 		},
 		"folder": {
