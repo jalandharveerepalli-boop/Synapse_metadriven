@@ -1,0 +1,9 @@
+{
+	"name": "jave-adf-etl",
+	"location": "francecentral",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "de5681df-6ea2-434b-bb80-01a2fb17b36f",
+		"tenantId": "08d1aeb2-6777-409b-9a9f-92afbdfa42db"
+	}
+}
